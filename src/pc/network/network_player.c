@@ -1,3 +1,4 @@
+#include "sm64.h"
 #include "network_player.h"
 #include "types.h"
 #include "object_fields.h"
@@ -13,6 +14,7 @@
 #include "game/object_helpers.h"
 #include "pc/lua/smlua_hooks.h"
 #include "pc/network/socket/socket.h"
+#include "pc/lua/utils/smlua_model_utils.h"
 #include "lag_compensation.h"
 #ifdef DISCORD_SDK
 #include "pc/discord/discord.h"
@@ -61,6 +63,18 @@ void network_player_update_model(u8 localIndex) {
     m->character = &gCharacters[index];
 
     if (m->marioObj == NULL || m->marioObj->behavior != bhvMario) { return; }
+
+    if (localIndex == 0 && configPlayerMoonosGeo[0] != '\0') {
+        enum ModelExtendedId extId = smlua_model_util_get_id(configPlayerMoonosGeo);
+        if (extId != E_MODEL_ERROR_MODEL) {
+            u16 loadedId = smlua_model_util_load(extId);
+            if (loadedId != MODEL_ERROR_MODEL && loadedId != MODEL_NONE) {
+                obj_set_model(m->marioObj, loadedId);
+                return;
+            }
+        }
+    }
+
     obj_set_model(m->marioObj, m->character->modelId);
 }
 

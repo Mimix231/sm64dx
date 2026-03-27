@@ -132,6 +132,8 @@ extern bool         configCtxProfiler;
 extern char         configPlayerName[MAX_CONFIG_STRING];
 extern unsigned int configPlayerModel;
 extern struct PlayerPalette configPlayerPalette;
+extern char         configPlayerMoonosPack[MAX_CONFIG_STRING];
+extern char         configPlayerMoonosGeo[MAX_CONFIG_STRING];
 // coop settings
 extern unsigned int configAmountOfPlayers;
 extern bool         configBubbleDeath;

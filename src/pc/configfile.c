@@ -168,6 +168,8 @@ bool         configCtxProfiler                    = false;
 char         configPlayerName[MAX_CONFIG_STRING]  = "";
 unsigned int configPlayerModel                    = 0;
 struct PlayerPalette configPlayerPalette          = { { { 0x00, 0x00, 0xff }, { 0xff, 0x00, 0x00 }, { 0xff, 0xff, 0xff }, { 0x72, 0x1c, 0x0e }, { 0x73, 0x06, 0x00 }, { 0xfe, 0xc1, 0x79 }, { 0xff, 0x00, 0x00 }, { 0xff, 0x00, 0x00 } } };
+char         configPlayerMoonosPack[MAX_CONFIG_STRING] = "";
+char         configPlayerMoonosGeo[MAX_CONFIG_STRING]  = "";
 // coop settings
 unsigned int configAmountOfPlayers                = MAX_PLAYERS;
 bool         configBubbleDeath                    = true;
@@ -324,6 +326,8 @@ static const struct ConfigOption options[] = {
     // player settings
     {.name = "coop_player_name",               .type = CONFIG_TYPE_STRING, .stringValue = (char*)&configPlayerName, .maxStringLength = MAX_CONFIG_STRING},
     {.name = "coop_player_model",              .type = CONFIG_TYPE_UINT,   .uintValue   = &configPlayerModel},
+    {.name = "dx_player_moonos_pack",          .type = CONFIG_TYPE_STRING, .stringValue = (char*)&configPlayerMoonosPack, .maxStringLength = MAX_CONFIG_STRING},
+    {.name = "dx_player_moonos_geo",           .type = CONFIG_TYPE_STRING, .stringValue = (char*)&configPlayerMoonosGeo, .maxStringLength = MAX_CONFIG_STRING},
     {.name = "coop_player_palette_pants",      .type = CONFIG_TYPE_COLOR,  .colorValue  = &configPlayerPalette.parts[PANTS]},
     {.name = "coop_player_palette_shirt",      .type = CONFIG_TYPE_COLOR,  .colorValue  = &configPlayerPalette.parts[SHIRT]},
     {.name = "coop_player_palette_gloves",     .type = CONFIG_TYPE_COLOR,  .colorValue  = &configPlayerPalette.parts[GLOVES]},
