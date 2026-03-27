@@ -1,0 +1,20 @@
+CREDIT_SUPPORTERS = {
+    "Saul",
+    "Ellie",
+    "Lyrae",
+    "Sophia",
+    "maemae",
+    "charity",
+    "Yuyake",
+    "VioletArts",
+    "Nope208",
+    "Jack Black",
+    "GRAND DAD",
+    "Key's Artworks",
+    "Kale!",
+    "Mori",
+    "milk",
+    "Konata K.",
+    "Gamebun",
+    "Mama Moon"
+}
