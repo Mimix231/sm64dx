@@ -1,20 +1,15 @@
 #include "discord.h"
 #include "pc/pc_main.h"
-#include "pc/mxui/mxui_exports.h"
-#include "pc/network/network.h"
+#include "pc/djui/djui.h"
 #include "pc/mods/mods.h"
 #include "pc/debuglog.h"
 #include "pc/utils/misc.h"
-#include "pc/mxui/mxui_exports.h"
 #ifdef COOPNET
 #include "pc/network/coopnet/coopnet.h"
 #endif
 
 extern struct DiscordApplication app;
 struct DiscordActivity sCurActivity = { 0 };
-static int sQueuedLobby = 0;
-static uint64_t sQueuedLobbyId = 0;
-static char sQueuedLobbyPassword[64] = "";
 
 static void on_activity_update_callback(UNUSED void* data, enum EDiscordResult result) {
     LOG_INFO("> on_activity_update_callback returned %d", result);
@@ -23,33 +18,7 @@ static void on_activity_update_callback(UNUSED void* data, enum EDiscordResult r
 
 static void on_activity_join(UNUSED void* data, const char* secret) {
     LOG_INFO("> on_activity_join, secret: %s", secret);
-    char *token;
-
-    // extract lobby type
-    token = strtok((char*)secret, ":");
-    if (strcmp(token, "coopnet") != 0) {
-        LOG_ERROR("Tried to join unrecognized lobby type: %s", token);
-        return;
-    }
-
-#ifdef COOPNET
-    // extract lobby ID
-    token = strtok(NULL, ":");
-    char* end;
-    u64 lobbyId = strtoull(token, &end, 10);
-
-    // extract lobby password
-    token = strtok(NULL, ":");
-    if (token == NULL) { token = ""; }
-
-    // join
-    if (gNetworkType != NT_NONE) {
-        network_shutdown(true, false, false, false);
-    }
-    sQueuedLobbyId = lobbyId;
-    snprintf(sQueuedLobbyPassword, 64, "%s", token);
-    sQueuedLobby = 2;
-#endif
+    LOG_INFO("sm64dx is offline-only. Ignoring Discord join request.");
 }
 
 static void on_activity_join_request_callback(UNUSED void* data, enum EDiscordResult result) {
@@ -92,13 +61,12 @@ static void discord_populate_details(char* buffer, int bufferLength) {
 }
 
 void discord_activity_update(void) {
-    bool offline = network_system_is_offline();
     sCurActivity.type = DiscordActivityType_Playing;
 
     snprintf(sCurActivity.assets.large_image, 128, "characters");
-    snprintf(sCurActivity.assets.large_text, 128, "SM64 DX Characters");
+    snprintf(sCurActivity.assets.large_text, 128, "sm64coopdx Characters");
     snprintf(sCurActivity.assets.small_image, 128, "icon");
-    snprintf(sCurActivity.assets.small_text, 128, "SM64 DX");
+    snprintf(sCurActivity.assets.small_text, 128, "sm64coopdx Icon");
 
     if (gNetworkType != NT_NONE && gNetworkSystem) {
         gNetworkSystem->get_lobby_id(sCurActivity.party.id, 128);
@@ -112,9 +80,9 @@ void discord_activity_update(void) {
         sCurActivity.party.size.max_size = 1;
     }
 
-    if ((!gDjuiInMainMenu) && (offline || sCurActivity.party.size.current_size > 1 || configAmountOfPlayers == 1)) {
+    if ((sCurActivity.party.size.current_size > 1 || configAmountOfPlayers == 1) && !gDjuiInMainMenu) {
         strcpy(sCurActivity.state, "Playing!");
-    } else if (gNetworkType == NT_SERVER && !offline) {
+    } else if (gNetworkType == NT_SERVER) {
         strcpy(sCurActivity.state, "Waiting for players...");
     } else {
         strcpy(sCurActivity.state, "In the menus.");
@@ -145,19 +113,6 @@ void discord_activity_update(void) {
 }
 
 void discord_activity_update_check(void) {
-#ifdef COOPNET
-    if (sQueuedLobby > 0) {
-        if (--sQueuedLobby == 0) {
-            gCoopNetDesiredLobby = sQueuedLobbyId;
-            snprintf(gCoopNetPassword, 64, "%s", sQueuedLobbyPassword);
-            network_reset_reconnect_and_rehost();
-            network_set_system(NS_COOPNET);
-            network_init(NT_CLIENT, false);
-            djui_panel_join_message_create(NULL);
-        }
-    }
-#endif
-
     if (gNetworkType == NT_NONE) { return; }
     bool shouldUpdate = false;
     u8 connectedCount = network_player_connected_count();

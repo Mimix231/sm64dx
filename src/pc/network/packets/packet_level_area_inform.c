@@ -4,7 +4,7 @@
 //#define DISABLE_MODULE_LOG 1
 #include "pc/debuglog.h"
 
-#include "pc/mxui/mxui_exports.h"
+#include "pc/djui/djui.h"
 #include "game/level_info.h"
 #include "game/mario_misc.h"
 

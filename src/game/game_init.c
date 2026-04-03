@@ -20,8 +20,8 @@
 #include "segment2.h"
 #include "segment_symbols.h"
 #include "rng_position.h"
-#include "pc/mxui/mxui.h"
-#include "pc/mxui/mxui_runtime.h"
+#include "pc/djui/djui.h"
+#include "pc/djui/djui_panel_pause.h"
 #include "rumble_init.h"
 #include <prevent_bss_reordering.h>
 #include "bettercamera.h"
@@ -253,7 +253,8 @@ void end_master_display_list(void) {
         draw_profiler();
     }
 
-    mxui_runtime_render();
+    extern void djui_render(void);
+    djui_render();
 
     gDPFullSync(gDisplayListHead++);
     gSPEndDisplayList(gDisplayListHead++);
@@ -462,8 +463,7 @@ void read_controller_inputs(void) {
     // controller information.
     if (gControllerBits) {
         osRecvMesg(&gSIEventMesgQueue, &D_80339BEC, OS_MESG_BLOCK);
-        osContGetReadData(&gControllerPads[0]);
-
+        osContGetReadData(gInteractableOverridePad ? &gInteractablePad : &gControllerPads[0]);
     }
     run_demo_inputs();
 
@@ -482,20 +482,6 @@ void read_controller_inputs(void) {
             // 0.5x A presses are a good meme
             controller->buttonDown = controller->controllerData->button;
             adjust_analog_stick(controller);
-
-            // Keep paused gameplay deterministic while the MXUI pause shell is open.
-            if (i == 0 && mxui_is_pause_active()) {
-                controller->rawStickX = 0;
-                controller->rawStickY = 0;
-                controller->extStickX = 0;
-                controller->extStickY = 0;
-                controller->buttonPressed = 0;
-                controller->buttonReleased = 0;
-                controller->buttonDown = 0;
-                controller->stickX = 0;
-                controller->stickY = 0;
-                controller->stickMag = 0;
-            }
         } else if (i != 0) {
             // otherwise, if the controllerData is NULL, 0 out all of the inputs.
             controller->rawStickX = 0;

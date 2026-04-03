@@ -17,7 +17,6 @@
 #define STICK_XMASK 0x30000
 #define STICK_YMASK 0xc0000
 
-#include <stdbool.h>
 #include <ultra64.h>
 
 struct ControllerAPI {
@@ -34,15 +33,6 @@ struct ControllerAPI {
 // used for binding keys
 u32 controller_get_raw_key(void);
 void controller_reconfigure(void);
-bool controller_key_down(u32 vk);
-bool controller_key_pressed(u32 vk);
-bool controller_key_released(u32 vk);
-bool controller_bind_down(const unsigned int bindValue[]);
-bool controller_bind_pressed(const unsigned int bindValue[]);
-bool controller_bind_released(const unsigned int bindValue[]);
-void controller_set_key_state(u32 vk, bool down);
-void controller_clear_key_states(u32 vkBase, u32 count);
-void controller_finalize_frame(void);
 
 // rumbles all controllers with rumble support
 void controller_rumble_play(float str, float time);

@@ -35,7 +35,7 @@
 #include "pc/configfile.h"
 #include "pc/network/network.h"
 #include "pc/lua/smlua_hooks.h"
-#include "pc/mxui/mxui_exports.h"
+#include "pc/djui/djui.h"
 #include "first_person_cam.h"
 #include "rendering_graph_node.h"
 
@@ -540,27 +540,6 @@ void skip_camera_interpolation(void) {
  * Starts a camera shake triggered by an interaction
  */
 void set_camera_shake_from_hit(s16 shake) {
-    if (configReduceCameraShake) {
-        switch (shake) {
-            case SHAKE_ATTACK:
-                gLakituState.focHSpeed = 0;
-                gLakituState.posHSpeed = 0;
-                return;
-            case SHAKE_SMALL_DAMAGE:
-            case SHAKE_MED_DAMAGE:
-            case SHAKE_LARGE_DAMAGE:
-                gLakituState.focHSpeed = 0;
-                gLakituState.posHSpeed = 0;
-                return;
-            case SHAKE_HIT_FROM_BELOW:
-                gLakituState.focHSpeed = 0.07f;
-                gLakituState.posHSpeed = 0.07f;
-                return;
-            default:
-                return;
-        }
-    }
-
     switch (shake) {
         // Makes the camera stop for a bit
         case SHAKE_ATTACK:
@@ -638,10 +617,6 @@ void set_camera_shake_from_hit(s16 shake) {
  * Start a shake from the environment
  */
 void set_environmental_camera_shake(s16 shake) {
-    if (configReduceCameraShake) {
-        return;
-    }
-
     switch (shake) {
         case SHAKE_ENV_EXPLOSION:
             set_camera_pitch_shake(0x60, 0x8, 0x4000);
@@ -686,10 +661,6 @@ void set_environmental_camera_shake(s16 shake) {
  * Starts a camera shake, but scales the amplitude by the point's distance from the camera
  */
 void set_camera_shake_from_point(s16 shake, f32 posX, f32 posY, f32 posZ) {
-    if (configReduceCameraShake) {
-        return;
-    }
-
     switch (shake) {
         case SHAKE_POS_BOWLING_BALL:
             set_pitch_shake_from_point(0x28, 0x8, 0x4000, 2000.f, posX, posY, posZ);
@@ -10962,6 +10933,8 @@ BAD_RETURN(s32) cutscene_door_mode(struct Camera *c) {
     }
 }
 
+// coop specific
+extern struct DjuiText* gDjuiPaletteToggle;
 void cutscene_palette_editor(struct Camera *c) {
     if (!c) { return; }
     struct MarioState* m = gMarioState;
@@ -10984,13 +10957,24 @@ void cutscene_palette_editor(struct Camera *c) {
 
     // Press the Z bind to toggle cap
     static bool pressed = false;
-    if (gInteractablePad.button & Z_TRIG) {
+    if (gInteractablePad.button & PAD_BUTTON_Z) {
         if (!capMissing && !pressed && m->action == ACT_IDLE) {
             set_mario_action(m, ACT_PALETTE_EDITOR_CAP, (m->flags & MARIO_CAP_ON_HEAD) != 0);
         }
         pressed = true;
     } else {
         pressed = false;
+    }
+
+    // Hide text if it is not possible to toggle cap
+    if (gDjuiPaletteToggle) {
+        djui_base_set_visible(
+            &gDjuiPaletteToggle->base,
+            (
+                m->action == ACT_IDLE ||
+                m->action == ACT_PALETTE_EDITOR_CAP 
+            ) && !capMissing
+        );
     }
 
     c->pos[0] = m->pos[0] + (0x200 * sins(m->faceAngle[1]));

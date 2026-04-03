@@ -40,13 +40,11 @@
 #include "pc/pc_main.h"
 #include "pc/cliopts.h"
 #include "pc/configfile.h"
-#include "pc/controller/controller_api.h"
-#include "pc/controller/controller_keyboard.h"
 #include "pc/network/network.h"
+#include "pc/djui/djui.h"
+// used for getting gMainMenuSounds
+#include "pc/djui/djui_panel_menu_options.h"
 #include "pc/lua/smlua_hooks.h"
-#include "pc/mxui/mxui.h"
-#include "pc/mxui/mxui_assets.h"
-#include "pc/mxui/mxui_exports.h"
 #include "pc/mods/mods.h"
 #include "pc/nametags.h"
 
@@ -267,14 +265,6 @@ bool pressed_pause(void) {
     }
 
     return false;
-}
-
-static bool pressed_game_menu(void) {
-    return controller_bind_pressed(configKeyGameMenu);
-}
-
-static bool pressed_character_select(void) {
-    return controller_key_pressed(VK_BASE_KEYBOARD + SCANCODE_C);
 }
 
 void set_play_mode(s16 playMode) {
@@ -1263,8 +1253,7 @@ static void start_demo(void) {
     }
 }
 
-void stop_demo(void* caller) {
-    (void)caller;
+void stop_demo(UNUSED struct DjuiBase* caller) {
     if (gIsDemoActive) {
         gIsDemoActive = false;
         gCurrDemoInput = NULL;
@@ -1324,40 +1313,6 @@ s32 play_mode_normal(void) {
         }
     }
 
-    bool offlineMxuiPauseOnly = network_system_is_offline() && !gDjuiInMainMenu;
-    bool wantsPauseMenu = gDjuiInMainMenu
-        ? false
-        : (offlineMxuiPauseOnly ? pressed_game_menu() : (pressed_pause() || pressed_game_menu()));
-
-    if (!gDjuiInMainMenu
-        && !gReceiveWarp.received
-        && sCurrPlayMode == PLAY_MODE_NORMAL
-        && sWarpDest.type == WARP_TYPE_NOT_WARPING
-        && sTransitionTimer == 0
-        && pressed_character_select()) {
-        if (mxui_open_character_select_menu()) {
-            return 0;
-        }
-    }
-
-    if (!gReceiveWarp.received
-        && sCurrPlayMode == PLAY_MODE_NORMAL
-        && sWarpDest.type == WARP_TYPE_NOT_WARPING
-        && sTransitionTimer == 0
-        && wantsPauseMenu) {
-        bool useDxPauseMenu = !gDjuiInMainMenu;
-        if (!useDxPauseMenu) {
-            lower_background_noise(1);
-            cancel_rumble();
-            gCameraMovementFlags |= CAM_MOVE_PAUSE_SCREEN;
-            gPauseMenuHidden = true;
-            set_play_mode(PLAY_MODE_PAUSED);
-        } else {
-            mxui_try_open_pause_menu();
-        }
-        return 0;
-    }
-
     area_update_objects();
     update_hud_values();
 
@@ -1383,6 +1338,11 @@ s32 play_mode_normal(void) {
                 set_play_mode(PLAY_MODE_CHANGE_LEVEL);
             } else if (sTransitionTimer != 0) {
                 set_play_mode(PLAY_MODE_CHANGE_AREA);
+            } else if (sCurrPlayMode == PLAY_MODE_NORMAL && pressed_pause()) {
+                lower_background_noise(1);
+                cancel_rumble();
+                gCameraMovementFlags |= CAM_MOVE_PAUSE_SCREEN;
+                set_play_mode(PLAY_MODE_PAUSED);
             }
         }
     }
@@ -1394,9 +1354,6 @@ s32 play_mode_normal(void) {
 s32 play_mode_paused(void) {
     if (gPauseScreenMode == 0) {
         set_menu_mode(RENDER_PAUSE_SCREEN);
-        if (gPauseMenuHidden && !mxui_is_pause_active() && !gDjuiInMainMenu) {
-            mxui_open_pause_menu();
-        }
     } else if (gPauseScreenMode == 1) {
         raise_background_noise(1);
         gCameraMovementFlags &= ~CAM_MOVE_PAUSE_SCREEN;

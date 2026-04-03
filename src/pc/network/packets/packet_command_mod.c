@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include "../network.h"
-#include "pc/mxui/mxui_language.h"
-#include "pc/mxui/mxui_exports.h"
+#include "pc/djui/djui_language.h"
+#include "pc/djui/djui_chat_message.h"
 #include "pc/network/ban_list.h"
 #include "pc/network/moderator_list.h"
 #include "pc/debuglog.h"

@@ -7,11 +7,11 @@
 #endif
 
 #include "update_checker.h"
-#include "pc/mxui/mxui_popup.h"
+#include "pc/djui/djui.h"
 #include "pc/network/version.h"
 #include "pc/loading.h"
 
-#define URL ""
+#define URL "https://raw.githubusercontent.com/coop-deluxe/sm64coopdx/refs/heads/main/src/pc/network/version.h"
 #define VERSION_IDENTIFIER "#define SM64COOPDX_VERSION \""
 
 /*
@@ -29,7 +29,7 @@ bool gUpdateMessage = false;
 
 void show_update_popup(void) {
     if (sVersionUpdateTextBuffer[0] == '\0') { return; }
-    mxui_popup_create(sVersionUpdateTextBuffer, 3);
+    djui_popup_create(sVersionUpdateTextBuffer, 3);
 }
 
 #if !(defined(_WIN32) || defined(_WIN64))
@@ -71,7 +71,7 @@ void get_version_remote(void) {
     char buffer[0xFF] = { 0 };
 
     // initialize WinINet
-    HINTERNET hInternet = InternetOpenA("sm64dx", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
+    HINTERNET hInternet = InternetOpenA("sm64coopdx", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
     if (!hInternet) {
         printf("Failed to check for updates!\n");
         InternetCloseHandle(hInternet);
@@ -142,8 +142,19 @@ void get_version_remote(void) {
 }
 
 void check_for_updates(void) {
-    LOADING_SCREEN_MUTEX(loading_screen_set_segment_text("Preparing Startup"));
-    sRemoteVersion[0] = '\0';
-    sVersionUpdateTextBuffer[0] = '\0';
-    gUpdateMessage = false;
+    LOADING_SCREEN_MUTEX(loading_screen_set_segment_text("Checking For Updates"));
+
+    get_version_remote();
+    if (sRemoteVersion[0] == 'v' && strcmp(sRemoteVersion, get_version())) {
+        snprintf(
+            sVersionUpdateTextBuffer, 256,
+            "\\#ffffa0\\%s\n\\#dcdcdc\\%s: %s\n%s: %s",
+            DLANG(NOTIF, UPDATE_AVAILABLE),
+            DLANG(NOTIF, LATEST_VERSION),
+            sRemoteVersion,
+            DLANG(NOTIF, YOUR_VERSION),
+            get_version()
+        );
+        gUpdateMessage = true;
+    }
 }

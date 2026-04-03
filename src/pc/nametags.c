@@ -2,11 +2,10 @@
 #include "pc/network/network_player.h"
 #include "game/object_helpers.h"
 #include "behavior_data.h"
-#include "pc/mxui/mxui_exports.h"
+#include "pc/djui/djui_hud_utils.h"
 #include "engine/math_util.h"
 #include "game/obj_behaviors.h"
 #include "game/camera.h"
-#include "game/game_init.h"
 #include "pc/lua/utils/smlua_misc_utils.h"
 #include "pc/lua/smlua_hooks.h"
 
@@ -57,7 +56,7 @@ void nametags_render(void) {
         return;
     }
 
-    djui_hud_set_resolution(MXUI_HUD_RESOLUTION_N64);
+    djui_hud_set_resolution(RESOLUTION_N64);
     djui_hud_set_font(FONT_SPECIAL);
 
     for (u8 i = gNametagsSettings.showSelfTag ? 0 : 1; i < MAX_PLAYERS; i++) {

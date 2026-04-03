@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include "../network.h"
 #include "pc/debuglog.h"
-#include "pc/mxui/mxui_exports.h"
+#include "pc/djui/djui.h"
 #include "pc/debuglog.h"
 
 void network_send_global_popup(const char* message, int lines) {

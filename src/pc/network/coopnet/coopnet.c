@@ -4,8 +4,8 @@
 #include "coopnet_id.h"
 #include "pc/network/network.h"
 #include "pc/network/version.h"
-#include "pc/mxui/mxui_language.h"
-#include "pc/mxui/mxui_exports.h"
+#include "pc/djui/djui_language.h"
+#include "pc/djui/djui_popup.h"
 #include "pc/mods/mods.h"
 #include "pc/utils/misc.h"
 #include "pc/debuglog.h"
@@ -118,7 +118,7 @@ static void coopnet_on_error(enum MPacketErrorNumber error, uint64_t tag) {
                 } else if (localIndex != UNKNOWN_LOCAL_INDEX && gNetworkPlayers[localIndex].connected) {
                     name = gNetworkPlayers[localIndex].name;
                 }
-                mxui_language_replace(DLANG(NOTIF, PEER_FAILED), built, 256, '@', name);
+                djui_language_replace(DLANG(NOTIF, PEER_FAILED), built, 256, '@', name);
                 djui_popup_create(built, 2);
             }
             break;

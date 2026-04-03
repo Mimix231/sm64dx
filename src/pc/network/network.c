@@ -7,22 +7,21 @@
 #include "object_constants.h"
 #include "behavior_table.h"
 #include "pc/configfile.h"
+#include "pc/djui/djui.h"
+#include "pc/djui/djui_panel.h"
+#include "pc/djui/djui_hud_utils.h"
+#include "pc/djui/djui_panel_main.h"
 #include "pc/utils/misc.h"
 #include "pc/lua/smlua.h"
 #include "pc/lua/utils/smlua_model_utils.h"
 #include "pc/lua/utils/smlua_misc_utils.h"
 #include "pc/lua/utils/smlua_camera_utils.h"
 #include "pc/mods/mods.h"
-#include "pc/mods/mod_profiles.h"
 #include "pc/crash_handler.h"
 #include "pc/debuglog.h"
 #include "pc/pc_main.h"
 #include "pc/gfx/gfx_pc.h"
 #include "pc/fs/fmem.h"
-#include "pc/mxui/mxui.h"
-#include "pc/mxui/mxui_hud.h"
-#include "pc/mxui/mxui_language.h"
-#include "pc/mxui/mxui_popup.h"
 #include "game/hardcoded.h"
 #include "game/scroll_targets.h"
 #include "game/camera.h"
@@ -32,7 +31,6 @@
 #include "game/level_geo.h"
 #include "menu/intro_geo.h"
 #include "game/ingame_menu.h"
-#include "game/game_init.h"
 #include "game/first_person_cam.h"
 #include "game/envfx_snow.h"
 #include "game/mario.h"
@@ -96,8 +94,15 @@ struct NametagsSettings gNametagsSettings = {
     .showSelfTag = false,
 };
 
-bool network_system_is_offline(void) {
-    return gNetworkSystem == &gNetworkSystemOffline;
+static void network_activate_local_runtime(void) {
+    mods_activate(&gLocalMods);
+    smlua_init();
+
+    dynos_behavior_hook_all_custom_behaviors();
+
+    network_player_connected(NPT_LOCAL, 0, configPlayerModel, &configPlayerPalette, configPlayerName, get_local_discord_id());
+    extern u8* gOverrideEeprom;
+    gOverrideEeprom = NULL;
 }
 
 void network_set_system(enum NetworkSystemType nsType) {
@@ -108,7 +113,6 @@ void network_set_system(enum NetworkSystemType nsType) {
 #ifdef COOPNET
         case NS_COOPNET: gNetworkSystem = &gNetworkSystemCoopNet; break;
 #endif
-        case NS_OFFLINE: gNetworkSystem = &gNetworkSystemOffline; break;
         default: gNetworkSystem = &gNetworkSystemSocket; LOG_ERROR("Unknown network system: %d", nsType); break;
     }
 }
@@ -154,7 +158,7 @@ bool network_init(enum NetworkType inNetworkType, bool reconnecting) {
     int rc = gNetworkSystem->initialize(inNetworkType, reconnecting);
     if (!rc && inNetworkType != NT_NONE) {
         LOG_ERROR("failed to initialize network system");
-        mxui_popup_create(DLANG(NOTIF, DISCONNECT_CLOSED), 2);
+        djui_popup_create(DLANG(NOTIF, DISCONNECT_CLOSED), 2);
         return false;
     }
     if (gNetworkServerAddr != NULL) {
@@ -169,21 +173,16 @@ bool network_init(enum NetworkType inNetworkType, bool reconnecting) {
         extern s16 gCurrSaveFileNum;
         gCurrSaveFileNum = configHostSaveSlot;
 
-        mods_profile_save_last_session();
-        mods_activate(&gLocalMods);
-        smlua_init();
-
-        dynos_behavior_hook_all_custom_behaviors();
-
-        network_player_connected(NPT_LOCAL, 0, configPlayerModel, &configPlayerPalette, configPlayerName, get_local_discord_id());
-        extern u8* gOverrideEeprom;
-        gOverrideEeprom = NULL;
+        network_activate_local_runtime();
 
         if (gCurrLevelNum != (s16)gLevelValues.entryLevel) {
             extern s16 gChangeLevelTransition;
             gChangeLevelTransition = gLevelValues.entryLevel;
         }
 
+        djui_chat_box_create();
+    } else if (gNetworkType == NT_NONE) {
+        network_activate_local_runtime();
     }
 
     configfile_save(configfile_name());
@@ -193,6 +192,8 @@ bool network_init(enum NetworkType inNetworkType, bool reconnecting) {
         discord_activity_update();
     }
 #endif
+
+    djui_base_set_visible(&gDjuiModReload->base, network_allow_mod_dev_mode());
 
     LOG_INFO("initialized");
 
@@ -459,38 +460,11 @@ void network_reset_reconnect_and_rehost(void) {
 }
 
 void network_reconnect_begin(void) {
-    if (sNetworkReconnectTimer > 0) {
-        return;
-    }
-
-    sNetworkReconnectTimer = 2 * 30;
-
-#ifdef COOPNET
-    sNetworkReconnectType = (gNetworkSystem == &gNetworkSystemCoopNet)
-                          ? NS_COOPNET
-                          : NS_SOCKET;
-#else
-    sNetworkReconnectType = NS_SOCKET;
-#endif
-
     network_shutdown(false, false, false, true);
-
-    mxui_open_main_flow();
+    djui_connect_menu_open();
 }
 
 static void network_reconnect_update(void) {
-    if (sNetworkReconnectTimer <= 0) { return; }
-    if (--sNetworkReconnectTimer != 0) { return; }
-
-    if (sNetworkReconnectType == NS_SOCKET) {
-        network_set_system(NS_SOCKET);
-    } else if (sNetworkReconnectType == NS_COOPNET) {
-        network_set_system(NS_COOPNET);
-    }
-
-    network_init(NT_CLIENT, true);
-
-    network_send_mod_list_request();
 }
 
 bool network_is_reconnecting(void) {
@@ -498,25 +472,11 @@ bool network_is_reconnecting(void) {
 }
 
 void network_rehost_begin(void) {
-    for (int i = 1; i < MAX_PLAYERS; i++) {
-        struct NetworkPlayer* np = &gNetworkPlayers[i];
-        if (!np->connected) { continue; }
-
-        network_send_kick(i, EKT_REJOIN);
-        network_player_disconnected(i);
-    }
-
     network_shutdown(false, false, false, true);
-
-    sNetworkRehostTimer = 2;
+    djui_connect_menu_open();
 }
 
 static void network_rehost_update(void) {
-    if (sNetworkRehostTimer <= 0) { return; }
-    if (--sNetworkRehostTimer != 0) { return; }
-
-    network_init(NT_SERVER, true);
-    mxui_open_main_flow();
 }
 
 static void network_update_area_timer(void) {
@@ -634,11 +594,6 @@ void network_update(void) {
         }
     }*/
 
-    // Kick the player back to the Main Menu if network init failed
-    if ((gNetworkType == NT_NONE) && !gDjuiInMainMenu) {
-        network_reset_reconnect_and_rehost();
-        network_shutdown(true, false, false, false);
-    }
 }
 
 static inline void color_set(Color color, u8 r, u8 g, u8 b) {
@@ -661,6 +616,8 @@ void network_mod_dev_mode_reload(void) {
         }
     }
 
+    djui_lua_error_clear();
+
     LOG_CONSOLE(" ");
     LOG_CONSOLE("===================================================");
     LOG_CONSOLE("===================================================");
@@ -674,6 +631,11 @@ void network_mod_dev_mode_reload(void) {
 
 void network_shutdown(bool sendLeaving, bool exiting, bool popup, bool reconnecting) {
     smlua_call_event_hooks(HOOK_ON_EXIT);
+
+    if (gDjuiChatBox != NULL) {
+        djui_base_destroy(&gDjuiChatBox->base);
+        gDjuiChatBox = NULL;
+    }
 
     gNetworkSentJoin = false;
 
@@ -704,7 +666,7 @@ void network_shutdown(bool sendLeaving, bool exiting, bool popup, bool reconnect
     gOverrideEeprom = NULL;
     extern u8 gOverrideFreezeCamera;
     gOverrideFreezeCamera = false;
-    mxui_hud_set_mouse_locked(false);
+    gDjuiHudLockMouse = false;
     gOverrideNear = 0;
     gOverrideFar = 0;
     gOverrideFOV = 0;
@@ -783,7 +745,13 @@ void network_shutdown(bool sendLeaving, bool exiting, bool popup, bool reconnect
 
     init_mario_from_save_file();
 
-    mxui_open_main_flow();
+    djui_panel_shutdown();
+    extern bool gDjuiInMainMenu;
+    if (!gDjuiInMainMenu) {
+        gDjuiInMainMenu = true;
+        djui_panel_main_create(NULL);
+    }
+    djui_lua_error_clear();
 
 #ifdef DISCORD_SDK
     if (gDiscordInitialized) {
@@ -792,4 +760,5 @@ void network_shutdown(bool sendLeaving, bool exiting, bool popup, bool reconnect
 #endif
     packet_ordered_clear_all();
 
+    djui_reset_popup_disabled_override();
 }

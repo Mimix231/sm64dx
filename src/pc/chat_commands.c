@@ -1,8 +1,8 @@
 #include "pc/network/network.h"
 #include "pc/network/socket/socket.h"
 #include "pc/lua/smlua_hooks.h"
-#include "pc/mxui/mxui_language.h"
-#include "pc/mxui/mxui_exports.h"
+#include "pc/djui/djui_language.h"
+#include "pc/djui/djui_chat_message.h"
 #include "chat_commands.h"
 #include "pc/network/ban_list.h"
 #include "pc/network/moderator_list.h"
@@ -46,14 +46,11 @@ static void chat_construct_player_message(struct NetworkPlayer* np, char* msg) {
 
     char player[128] = { 0 };
     snprintf(player, 128, "%s%s\\#fff982\\", network_get_player_text_color_string(np->localIndex), np->name);
-    mxui_language_replace(msg, &built[9], 256 - 9, '@', player);
+    djui_language_replace(msg, &built[9], 256 - 9, '@', player);
     djui_chat_message_create(built);
 }
 
 bool exec_chat_command(char* command) {
-    (void)command;
-    return false;
-
     struct NetworkPlayer* npl = &gNetworkPlayers[0];
     enum ChatConfirmCommand ccc = sConfirming;
     sConfirming = CCC_NONE;

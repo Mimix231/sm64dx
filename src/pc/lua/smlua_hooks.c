@@ -6,7 +6,7 @@
 #include "behavior_commands.h"
 #include "pc/mods/mod.h"
 #include "game/object_list_processor.h"
-#include "pc/mxui/mxui_exports.h"
+#include "pc/djui/djui_chat_message.h"
 #include "pc/crash_handler.h"
 #include "game/hud.h"
 #include "game/level_update.h"
@@ -16,16 +16,12 @@
 #include "pc/network/socket/socket.h"
 #include "pc/chat_commands.h"
 #include "pc/pc_main.h"
+#include "pc/djui/djui_lua_profiler.h"
+#include "pc/djui/djui_panel.h"
 #include "pc/configfile.h"
-#include "pc/controller/controller_api.h"
-#include "pc/mxui/mxui.h"
-#include "pc/mxui/mxui_hud.h"
-#include "pc/mxui/mxui_popup.h"
 #include "pc/utils/misc.h"
 #include "pc/lua/utils/smlua_model_utils.h"
-#include "smlua_utils.h"
 
-#include "../mods/mod_bindings.h"
 #include "../mods/mods.h"
 #include "game/print.h"
 #include "gfx_dimensions.h"
@@ -1120,92 +1116,6 @@ int smlua_hook_on_sync_table_change(lua_State* L) {
 struct LuaHookedModMenuElement gHookedModMenuElements[MAX_HOOKED_MOD_MENU_ELEMENTS] = { 0 };
 int gHookedModMenuElementsCount = 0;
 
-void smlua_call_mod_menu_element_hook(struct LuaHookedModMenuElement* hooked, int index);
-
-static void smlua_mod_menu_init_element(struct LuaHookedModMenuElement* hooked, enum LuaModMenuElementType element, const char* name) {
-    memset(hooked, 0, sizeof(*hooked));
-    hooked->element = element;
-    snprintf(hooked->name, sizeof(hooked->name), "%s", name);
-    hooked->stringValue[0] = '\0';
-    hooked->configKey[0] = '\0';
-    for (int i = 0; i < MAX_BINDS; i++) {
-        hooked->bindValue[i] = VK_INVALID;
-        hooked->defaultBindValue[i] = VK_INVALID;
-    }
-    hooked->mod = gLuaActiveMod;
-    hooked->modFile = gLuaActiveModFile;
-}
-
-static void smlua_mod_menu_generate_config_key(struct LuaHookedModMenuElement* hooked, const char* name) {
-    char baseKey[sizeof(hooked->configKey)] = { 0 };
-    size_t out = 0;
-
-    for (const unsigned char* c = (const unsigned char*)name; *c != '\0' && out + 1 < sizeof(baseKey); c++) {
-        if (isalnum(*c)) {
-            baseKey[out++] = (char)tolower(*c);
-        } else if (out > 0 && baseKey[out - 1] != '-') {
-            baseKey[out++] = '-';
-        }
-    }
-
-    while (out > 0 && baseKey[out - 1] == '-') {
-        out--;
-    }
-    baseKey[out] = '\0';
-
-    if (baseKey[0] == '\0') {
-        snprintf(baseKey, sizeof(baseKey), "control");
-    }
-
-    snprintf(hooked->configKey, sizeof(hooked->configKey), "%s", baseKey);
-
-    int duplicateCount = 1;
-    for (int i = 0; i < gHookedModMenuElementsCount; i++) {
-        struct LuaHookedModMenuElement* other = &gHookedModMenuElements[i];
-        if (other->mod != hooked->mod) { continue; }
-        if (strcmp(other->configKey, hooked->configKey) == 0) {
-            duplicateCount++;
-        }
-    }
-
-    if (duplicateCount > 1) {
-        snprintf(hooked->configKey, sizeof(hooked->configKey), "%s-%d", baseKey, duplicateCount);
-    }
-}
-
-static bool smlua_mod_menu_read_bind_table(lua_State* L, int index, unsigned int bindValue[MAX_BINDS]) {
-    gSmLuaConvertSuccess = true;
-    if (lua_type(L, index) != LUA_TTABLE) {
-        LOG_LUA_LINE("Hook mod menu bind: expected a table of bind values");
-        gSmLuaConvertSuccess = false;
-        return false;
-    }
-
-    for (int i = 0; i < MAX_BINDS; i++) {
-        lua_rawgeti(L, index, i + 1);
-        if (lua_type(L, -1) == LUA_TNIL) {
-            bindValue[i] = VK_INVALID;
-        } else {
-            bindValue[i] = (unsigned int)smlua_to_integer(L, -1);
-            if (!gSmLuaConvertSuccess) {
-                lua_pop(L, 1);
-                return false;
-            }
-        }
-        lua_pop(L, 1);
-    }
-
-    return true;
-}
-
-static void smlua_mod_menu_push_bind_table(lua_State* L, const unsigned int bindValue[MAX_BINDS]) {
-    lua_newtable(L);
-    for (int i = 0; i < MAX_BINDS; i++) {
-        lua_pushinteger(L, bindValue[i]);
-        lua_rawseti(L, -2, i + 1);
-    }
-}
-
 int smlua_hook_mod_menu_text(lua_State* L) {
     if (L == NULL) { return 0; }
     if (!smlua_functions_valid_param_count(L, 1)) { return 0; }
@@ -1222,7 +1132,17 @@ int smlua_hook_mod_menu_text(lua_State* L) {
     }
 
     struct LuaHookedModMenuElement* hooked = &gHookedModMenuElements[gHookedModMenuElementsCount];
-    smlua_mod_menu_init_element(hooked, MOD_MENU_ELEMENT_TEXT, name);
+    hooked->element = MOD_MENU_ELEMENT_TEXT;
+    snprintf(hooked->name, 64, "%s", name);
+    hooked->boolValue = false;
+    hooked->uintValue = 0;
+    hooked->stringValue[0] = '\0';
+    hooked->length = 0;
+    hooked->sliderMin = 0;
+    hooked->sliderMax = 0;
+    hooked->reference = 0;
+    hooked->mod = gLuaActiveMod;
+    hooked->modFile = gLuaActiveModFile;
 
     lua_pushinteger(L, gHookedModMenuElementsCount);
     gHookedModMenuElementsCount++;
@@ -1251,8 +1171,17 @@ int smlua_hook_mod_menu_button(lua_State* L) {
     }
 
     struct LuaHookedModMenuElement* hooked = &gHookedModMenuElements[gHookedModMenuElementsCount];
-    smlua_mod_menu_init_element(hooked, MOD_MENU_ELEMENT_BUTTON, name);
+    hooked->element = MOD_MENU_ELEMENT_BUTTON;
+    snprintf(hooked->name, 64, "%s", name);
+    hooked->boolValue = false;
+    hooked->uintValue = 0;
+    hooked->stringValue[0] = '\0';
+    hooked->length = 0;
+    hooked->sliderMin = 0;
+    hooked->sliderMax = 0;
     hooked->reference = ref;
+    hooked->mod = gLuaActiveMod;
+    hooked->modFile = gLuaActiveModFile;
 
     lua_pushinteger(L, gHookedModMenuElementsCount);
     gHookedModMenuElementsCount++;
@@ -1287,9 +1216,17 @@ int smlua_hook_mod_menu_checkbox(lua_State* L) {
     }
 
     struct LuaHookedModMenuElement* hooked = &gHookedModMenuElements[gHookedModMenuElementsCount];
-    smlua_mod_menu_init_element(hooked, MOD_MENU_ELEMENT_CHECKBOX, name);
+    hooked->element = MOD_MENU_ELEMENT_CHECKBOX;
+    snprintf(hooked->name, 64, "%s", name);
     hooked->boolValue = defaultValue;
+    hooked->uintValue = 0;
+    hooked->stringValue[0] = '\0';
+    hooked->length = 0;
+    hooked->sliderMin = 0;
+    hooked->sliderMax = 0;
     hooked->reference = ref;
+    hooked->mod = gLuaActiveMod;
+    hooked->modFile = gLuaActiveModFile;
 
     lua_pushinteger(L, gHookedModMenuElementsCount);
     gHookedModMenuElementsCount++;
@@ -1336,11 +1273,17 @@ int smlua_hook_mod_menu_slider(lua_State* L) {
     }
 
     struct LuaHookedModMenuElement* hooked = &gHookedModMenuElements[gHookedModMenuElementsCount];
-    smlua_mod_menu_init_element(hooked, MOD_MENU_ELEMENT_SLIDER, name);
+    hooked->element = MOD_MENU_ELEMENT_SLIDER;
+    snprintf(hooked->name, 64, "%s", name);
+    hooked->boolValue = false;
     hooked->uintValue = defaultValue;
+    hooked->stringValue[0] = '\0';
+    hooked->length = 0;
     hooked->sliderMin = sliderMin;
     hooked->sliderMax = sliderMax;
     hooked->reference = ref;
+    hooked->mod = gLuaActiveMod;
+    hooked->modFile = gLuaActiveModFile;
 
     lua_pushinteger(L, gHookedModMenuElementsCount);
     gHookedModMenuElementsCount++;
@@ -1382,58 +1325,20 @@ int smlua_hook_mod_menu_inputbox(lua_State* L) {
     }
 
     struct LuaHookedModMenuElement* hooked = &gHookedModMenuElements[gHookedModMenuElementsCount];
-    smlua_mod_menu_init_element(hooked, MOD_MENU_ELEMENT_INPUTBOX, name);
+    hooked->element = MOD_MENU_ELEMENT_INPUTBOX;
+    snprintf(hooked->name, 64, "%s", name);
+    hooked->boolValue = false;
+    hooked->uintValue = 0;
     snprintf(hooked->stringValue, 256, "%s", defaultValue);
     hooked->length = length;
+    hooked->sliderMin = 0;
+    hooked->sliderMax = 0;
     hooked->reference = ref;
+    hooked->mod = gLuaActiveMod;
+    hooked->modFile = gLuaActiveModFile;
 
     lua_pushinteger(L, gHookedModMenuElementsCount);
     gHookedModMenuElementsCount++;
-    return 1;
-}
-
-int smlua_hook_mod_menu_bind(lua_State* L) {
-    if (L == NULL) { return 0; }
-    if (!smlua_functions_valid_param_count(L, 3)) { return 0; }
-
-    if (gHookedModMenuElementsCount >= MAX_HOOKED_MOD_MENU_ELEMENTS) {
-        LOG_LUA_LINE("Hooked mod menu element exceeded maximum references!");
-        return 0;
-    }
-
-    const char* name = smlua_to_string(L, 1);
-    if (name == NULL || strlen(name) == 0 || !gSmLuaConvertSuccess) {
-        LOG_LUA_LINE("Hook mod menu bind: tried to hook invalid element");
-        return 0;
-    }
-
-    unsigned int bindValue[MAX_BINDS] = { VK_INVALID, VK_INVALID, VK_INVALID };
-    if (!smlua_mod_menu_read_bind_table(L, 2, bindValue)) {
-        LOG_LUA_LINE("Hook mod menu bind: tried to use invalid default bind table");
-        return 0;
-    }
-
-    int ref = luaL_ref(L, LUA_REGISTRYINDEX);
-    if (ref == -1) {
-        LOG_LUA_LINE("Hook mod menu bind: tried to hook undefined function '%s'", gLuaActiveMod->name);
-        return 0;
-    }
-
-    int index = gHookedModMenuElementsCount;
-    struct LuaHookedModMenuElement* hooked = &gHookedModMenuElements[index];
-    smlua_mod_menu_init_element(hooked, MOD_MENU_ELEMENT_BIND, name);
-    hooked->reference = ref;
-    memcpy(hooked->bindValue, bindValue, sizeof(hooked->bindValue));
-    memcpy(hooked->defaultBindValue, bindValue, sizeof(hooked->defaultBindValue));
-    smlua_mod_menu_generate_config_key(hooked, name);
-
-    if (hooked->mod != NULL && hooked->configKey[0] != '\0') {
-        mod_bindings_get(hooked->mod->relativePath, hooked->configKey, hooked->bindValue);
-    }
-
-    gHookedModMenuElementsCount++;
-    smlua_call_mod_menu_element_hook(hooked, index);
-    lua_pushinteger(L, index);
     return 1;
 }
 
@@ -1507,33 +1412,6 @@ int smlua_update_mod_menu_element_slider(lua_State* L) {
     return 1;
 }
 
-int smlua_update_mod_menu_element_bind(lua_State* L) {
-    if (L == NULL) { return 0; }
-    if (!smlua_functions_valid_param_count(L, 2)) { return 0; }
-
-    int index = smlua_to_integer(L, 1);
-    if (index >= gHookedModMenuElementsCount || !gSmLuaConvertSuccess) {
-        LOG_LUA_LINE("Update mod menu element: tried to update invalid element");
-        return 0;
-    }
-
-    if (gHookedModMenuElements[index].element != MOD_MENU_ELEMENT_BIND) {
-        LOG_LUA_LINE("Update mod menu element: element is not a bind.");
-        return 0;
-    }
-
-    if (!smlua_mod_menu_read_bind_table(L, 2, gHookedModMenuElements[index].bindValue)) {
-        LOG_LUA_LINE("Update mod menu element: tried to update invalid bind table");
-        return 0;
-    }
-
-    struct LuaHookedModMenuElement* hooked = &gHookedModMenuElements[index];
-    if (hooked->mod != NULL && hooked->configKey[0] != '\0') {
-        mod_bindings_set(hooked->mod->relativePath, hooked->configKey, hooked->bindValue);
-    }
-    return 1;
-}
-
 int smlua_update_mod_menu_element_inputbox(lua_State* L) {
     if (L == NULL) { return 0; }
     if (!smlua_functions_valid_param_count(L, 2)) { return 0; }
@@ -1559,652 +1437,9 @@ int smlua_update_mod_menu_element_inputbox(lua_State* L) {
     return 1;
 }
 
-static int smlua_mod_bind_query(lua_State* L, bool (*query)(const unsigned int bindValue[MAX_BINDS]), const char* name) {
-    if (L == NULL) { return 0; }
-    if (!smlua_functions_valid_param_count(L, 1)) { return 0; }
-
-    unsigned int bindValue[MAX_BINDS] = { VK_INVALID, VK_INVALID, VK_INVALID };
-    if (!smlua_mod_menu_read_bind_table(L, 1, bindValue)) {
-        LOG_LUA_LINE("%s: tried to use an invalid bind table", name);
-        return 0;
-    }
-
-    lua_pushboolean(L, query(bindValue));
-    return 1;
-}
-
-int smlua_mod_bind_pressed(lua_State* L) {
-    return smlua_mod_bind_query(L, controller_bind_pressed, "mod_bind_pressed");
-}
-
-int smlua_mod_bind_down(lua_State* L) {
-    return smlua_mod_bind_query(L, controller_bind_down, "mod_bind_down");
-}
-
-int smlua_mod_bind_released(lua_State* L) {
-    return smlua_mod_bind_query(L, controller_bind_released, "mod_bind_released");
-}
-
-int smlua_is_game_menu_open(lua_State* L) {
-    if (L == NULL) { return 0; }
-    if (!smlua_functions_valid_param_count(L, 0)) { return 0; }
-
-    lua_pushboolean(L, mxui_is_pause_active());
-    return 1;
-}
-
-int smlua_is_character_select_menu_open(lua_State* L) {
-    if (L == NULL) { return 0; }
-    if (!smlua_functions_valid_param_count(L, 0)) { return 0; }
-
-    lua_pushboolean(L, mxui_is_character_select_active());
-    return 1;
-}
-
-int smlua_is_frontend_menu_open(lua_State* L) {
-    if (L == NULL) { return 0; }
-    if (!smlua_functions_valid_param_count(L, 0)) { return 0; }
-
-    lua_pushboolean(L, mxui_is_main_menu_active());
-    return 1;
-}
-
-int smlua_game_menu_open(lua_State* L) {
-    if (L == NULL) { return 0; }
-    if (!smlua_functions_valid_param_count(L, 0)) { return 0; }
-
-    lua_pushboolean(L, mxui_try_open_pause_menu());
-    return 1;
-}
-
-int smlua_game_menu_close(lua_State* L) {
-    if (L == NULL) { return 0; }
-    if (!smlua_functions_valid_param_count(L, 0)) { return 0; }
-
-    bool closed = false;
-    if (mxui_is_pause_active()) {
-        mxui_close_pause_menu_with_mode(1);
-        closed = true;
-    }
-    lua_pushboolean(L, closed);
-    return 1;
-}
-
-int smlua_game_menu_open_character_select(lua_State* L) {
-    if (L == NULL) { return 0; }
-    if (!smlua_functions_valid_param_count(L, 0)) { return 0; }
-
-    lua_pushboolean(L, mxui_open_character_select_menu());
-    return 1;
-}
-
-int smlua_mxui_popup_create(lua_State* L) {
-    if (L == NULL) { return 0; }
-    if (!smlua_functions_valid_param_range(L, 1, 2)) { return 0; }
-
-    const char* message = smlua_to_string(L, 1);
-    if (!gSmLuaConvertSuccess) {
-        LOG_LUA_LINE("mxui_popup_create: invalid message");
-        return 0;
-    }
-
-    int lines = 1;
-    if (lua_gettop(L) >= 2) {
-        lines = smlua_to_integer(L, 2);
-        if (!gSmLuaConvertSuccess) {
-            LOG_LUA_LINE("mxui_popup_create: invalid line count");
-            return 0;
-        }
-    }
-
-    mxui_popup_create(message, lines);
-    return 1;
-}
-
-int smlua_mxui_popup_create_global(lua_State* L) {
-    if (L == NULL) { return 0; }
-    if (!smlua_functions_valid_param_range(L, 1, 2)) { return 0; }
-
-    const char* message = smlua_to_string(L, 1);
-    if (!gSmLuaConvertSuccess) {
-        LOG_LUA_LINE("mxui_popup_create_global: invalid message");
-        return 0;
-    }
-
-    int lines = 1;
-    if (lua_gettop(L) >= 2) {
-        lines = smlua_to_integer(L, 2);
-        if (!gSmLuaConvertSuccess) {
-            LOG_LUA_LINE("mxui_popup_create_global: invalid line count");
-            return 0;
-        }
-    }
-
-    mxui_popup_create_global(message, lines);
-    return 1;
-}
-
-static void smlua_mxui_hud_push_color(lua_State* L, const struct MxuiHudColor* color) {
-    lua_createtable(L, 0, 4);
-    lua_pushinteger(L, color != NULL ? color->r : 255);
-    lua_setfield(L, -2, "r");
-    lua_pushinteger(L, color != NULL ? color->g : 255);
-    lua_setfield(L, -2, "g");
-    lua_pushinteger(L, color != NULL ? color->b : 255);
-    lua_setfield(L, -2, "b");
-    lua_pushinteger(L, color != NULL ? color->a : 255);
-    lua_setfield(L, -2, "a");
-}
-
-int smlua_mxui_hud_set_resolution(lua_State* L) {
-    if (L == NULL) { return 0; }
-    if (!smlua_functions_valid_param_count(L, 1)) { return 0; }
-
-    u8 resolutionType = (u8)smlua_to_integer(L, 1);
-    if (!gSmLuaConvertSuccess) {
-        LOG_LUA_LINE("mxui_hud_set_resolution: invalid resolution");
-        return 0;
-    }
-
-    mxui_hud_set_resolution(resolutionType);
-    return 0;
-}
-
-int smlua_mxui_hud_get_filter(lua_State* L) {
-    if (L == NULL) { return 0; }
-    if (!smlua_functions_valid_param_count(L, 0)) { return 0; }
-    lua_pushinteger(L, mxui_hud_get_filter());
-    return 1;
-}
-
-int smlua_mxui_hud_set_filter(lua_State* L) {
-    if (L == NULL) { return 0; }
-    if (!smlua_functions_valid_param_count(L, 1)) { return 0; }
-
-    u8 filterType = (u8)smlua_to_integer(L, 1);
-    if (!gSmLuaConvertSuccess) {
-        LOG_LUA_LINE("mxui_hud_set_filter: invalid filter");
-        return 0;
-    }
-
-    mxui_hud_set_filter(filterType);
-    return 0;
-}
-
-int smlua_mxui_hud_get_screen_width(lua_State* L) {
-    if (L == NULL) { return 0; }
-    if (!smlua_functions_valid_param_count(L, 0)) { return 0; }
-    lua_pushinteger(L, mxui_hud_get_screen_width());
-    return 1;
-}
-
-int smlua_mxui_hud_get_screen_height(lua_State* L) {
-    if (L == NULL) { return 0; }
-    if (!smlua_functions_valid_param_count(L, 0)) { return 0; }
-    lua_pushinteger(L, mxui_hud_get_screen_height());
-    return 1;
-}
-
-int smlua_mxui_hud_get_mouse_x(lua_State* L) {
-    if (L == NULL) { return 0; }
-    if (!smlua_functions_valid_param_count(L, 0)) { return 0; }
-    lua_pushnumber(L, mxui_hud_get_mouse_x());
-    return 1;
-}
-
-int smlua_mxui_hud_get_mouse_y(lua_State* L) {
-    if (L == NULL) { return 0; }
-    if (!smlua_functions_valid_param_count(L, 0)) { return 0; }
-    lua_pushnumber(L, mxui_hud_get_mouse_y());
-    return 1;
-}
-
-int smlua_mxui_hud_get_raw_mouse_x(lua_State* L) {
-    if (L == NULL) { return 0; }
-    if (!smlua_functions_valid_param_count(L, 0)) { return 0; }
-    lua_pushnumber(L, mxui_hud_get_raw_mouse_x());
-    return 1;
-}
-
-int smlua_mxui_hud_get_raw_mouse_y(lua_State* L) {
-    if (L == NULL) { return 0; }
-    if (!smlua_functions_valid_param_count(L, 0)) { return 0; }
-    lua_pushnumber(L, mxui_hud_get_raw_mouse_y());
-    return 1;
-}
-
-int smlua_mxui_hud_is_mouse_locked(lua_State* L) {
-    if (L == NULL) { return 0; }
-    if (!smlua_functions_valid_param_count(L, 0)) { return 0; }
-    lua_pushboolean(L, mxui_hud_is_mouse_locked());
-    return 1;
-}
-
-int smlua_mxui_hud_set_mouse_locked(lua_State* L) {
-    if (L == NULL) { return 0; }
-    if (!smlua_functions_valid_param_count(L, 1)) { return 0; }
-
-    bool locked = smlua_to_boolean(L, 1);
-    if (!gSmLuaConvertSuccess) {
-        LOG_LUA_LINE("mxui_hud_set_mouse_locked: invalid locked flag");
-        return 0;
-    }
-
-    mxui_hud_set_mouse_locked(locked);
-    return 0;
-}
-
-int smlua_mxui_hud_get_mouse_buttons_down(lua_State* L) {
-    if (L == NULL) { return 0; }
-    if (!smlua_functions_valid_param_count(L, 0)) { return 0; }
-    lua_pushinteger(L, mxui_hud_get_mouse_buttons_down());
-    return 1;
-}
-
-int smlua_mxui_hud_get_mouse_buttons_pressed(lua_State* L) {
-    if (L == NULL) { return 0; }
-    if (!smlua_functions_valid_param_count(L, 0)) { return 0; }
-    lua_pushinteger(L, mxui_hud_get_mouse_buttons_pressed());
-    return 1;
-}
-
-int smlua_mxui_hud_get_mouse_buttons_released(lua_State* L) {
-    if (L == NULL) { return 0; }
-    if (!smlua_functions_valid_param_count(L, 0)) { return 0; }
-    lua_pushinteger(L, mxui_hud_get_mouse_buttons_released());
-    return 1;
-}
-
-int smlua_mxui_hud_get_mouse_scroll_x(lua_State* L) {
-    if (L == NULL) { return 0; }
-    if (!smlua_functions_valid_param_count(L, 0)) { return 0; }
-    lua_pushnumber(L, mxui_hud_get_mouse_scroll_x());
-    return 1;
-}
-
-int smlua_mxui_hud_set_font(lua_State* L) {
-    if (L == NULL) { return 0; }
-    if (!smlua_functions_valid_param_count(L, 1)) { return 0; }
-
-    s8 fontType = (s8)smlua_to_integer(L, 1);
-    if (!gSmLuaConvertSuccess) {
-        LOG_LUA_LINE("mxui_hud_set_font: invalid font");
-        return 0;
-    }
-
-    mxui_hud_set_font(fontType);
-    return 0;
-}
-
-int smlua_mxui_hud_get_font(lua_State* L) {
-    if (L == NULL) { return 0; }
-    if (!smlua_functions_valid_param_count(L, 0)) { return 0; }
-    lua_pushinteger(L, mxui_hud_get_font());
-    return 1;
-}
-
-int smlua_mxui_hud_set_color(lua_State* L) {
-    if (L == NULL) { return 0; }
-    if (!smlua_functions_valid_param_count(L, 4)) { return 0; }
-
-    u8 r = (u8)smlua_to_integer(L, 1);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_set_color: invalid red"); return 0; }
-    u8 g = (u8)smlua_to_integer(L, 2);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_set_color: invalid green"); return 0; }
-    u8 b = (u8)smlua_to_integer(L, 3);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_set_color: invalid blue"); return 0; }
-    u8 a = (u8)smlua_to_integer(L, 4);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_set_color: invalid alpha"); return 0; }
-
-    mxui_hud_set_color(r, g, b, a);
-    return 0;
-}
-
-int smlua_mxui_hud_get_color(lua_State* L) {
-    if (L == NULL) { return 0; }
-    if (!smlua_functions_valid_param_count(L, 0)) { return 0; }
-    smlua_mxui_hud_push_color(L, mxui_hud_get_color());
-    return 1;
-}
-
-int smlua_mxui_hud_reset_color(lua_State* L) {
-    if (L == NULL) { return 0; }
-    if (!smlua_functions_valid_param_count(L, 0)) { return 0; }
-    mxui_hud_reset_color();
-    return 0;
-}
-
-int smlua_mxui_hud_set_rotation(lua_State* L) {
-    if (L == NULL) { return 0; }
-    if (!smlua_functions_valid_param_count(L, 3)) { return 0; }
-
-    s16 rotation = (s16)smlua_to_integer(L, 1);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_set_rotation: invalid rotation"); return 0; }
-    f32 pivotX = smlua_to_number(L, 2);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_set_rotation: invalid pivotX"); return 0; }
-    f32 pivotY = smlua_to_number(L, 3);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_set_rotation: invalid pivotY"); return 0; }
-
-    mxui_hud_set_rotation(rotation, pivotX, pivotY);
-    return 0;
-}
-
-int smlua_mxui_hud_measure_text(lua_State* L) {
-    if (L == NULL) { return 0; }
-    if (!smlua_functions_valid_param_count(L, 1)) { return 0; }
-
-    const char* message = smlua_to_string(L, 1);
-    if (!gSmLuaConvertSuccess) {
-        LOG_LUA_LINE("mxui_hud_measure_text: invalid message");
-        return 0;
-    }
-
-    lua_pushnumber(L, mxui_hud_measure_text(message));
-    return 1;
-}
-
-int smlua_mxui_hud_print_text(lua_State* L) {
-    if (L == NULL) { return 0; }
-    if (!smlua_functions_valid_param_count(L, 4)) { return 0; }
-
-    const char* message = smlua_to_string(L, 1);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_print_text: invalid message"); return 0; }
-    f32 x = smlua_to_number(L, 2);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_print_text: invalid x"); return 0; }
-    f32 y = smlua_to_number(L, 3);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_print_text: invalid y"); return 0; }
-    f32 scale = smlua_to_number(L, 4);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_print_text: invalid scale"); return 0; }
-
-    mxui_hud_print_text(message, x, y, scale);
-    return 0;
-}
-
-int smlua_mxui_hud_print_text_interpolated(lua_State* L) {
-    if (L == NULL) { return 0; }
-    if (!smlua_functions_valid_param_count(L, 7)) { return 0; }
-
-    const char* message = smlua_to_string(L, 1);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_print_text_interpolated: invalid message"); return 0; }
-    f32 prevX = smlua_to_number(L, 2);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_print_text_interpolated: invalid prevX"); return 0; }
-    f32 prevY = smlua_to_number(L, 3);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_print_text_interpolated: invalid prevY"); return 0; }
-    f32 prevScale = smlua_to_number(L, 4);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_print_text_interpolated: invalid prevScale"); return 0; }
-    f32 x = smlua_to_number(L, 5);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_print_text_interpolated: invalid x"); return 0; }
-    f32 y = smlua_to_number(L, 6);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_print_text_interpolated: invalid y"); return 0; }
-    f32 scale = smlua_to_number(L, 7);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_print_text_interpolated: invalid scale"); return 0; }
-
-    mxui_hud_print_text_interpolated(message, prevX, prevY, prevScale, x, y, scale);
-    return 0;
-}
-
-int smlua_mxui_hud_render_texture(lua_State* L) {
-    if (L == NULL) { return 0; }
-    if (!smlua_functions_valid_param_count(L, 5)) { return 0; }
-
-    struct TextureInfo* texInfo = smlua_to_texture_info(L, 1);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_render_texture: invalid texture"); return 0; }
-    f32 x = smlua_to_number(L, 2);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_render_texture: invalid x"); return 0; }
-    f32 y = smlua_to_number(L, 3);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_render_texture: invalid y"); return 0; }
-    f32 scaleW = smlua_to_number(L, 4);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_render_texture: invalid scaleW"); return 0; }
-    f32 scaleH = smlua_to_number(L, 5);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_render_texture: invalid scaleH"); return 0; }
-
-    mxui_hud_render_texture(texInfo, x, y, scaleW, scaleH);
-    return 0;
-}
-
-int smlua_mxui_hud_render_texture_tile(lua_State* L) {
-    if (L == NULL) { return 0; }
-    if (!smlua_functions_valid_param_count(L, 9)) { return 0; }
-
-    struct TextureInfo* texInfo = smlua_to_texture_info(L, 1);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_render_texture_tile: invalid texture"); return 0; }
-    f32 x = smlua_to_number(L, 2);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_render_texture_tile: invalid x"); return 0; }
-    f32 y = smlua_to_number(L, 3);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_render_texture_tile: invalid y"); return 0; }
-    f32 scaleW = smlua_to_number(L, 4);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_render_texture_tile: invalid scaleW"); return 0; }
-    f32 scaleH = smlua_to_number(L, 5);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_render_texture_tile: invalid scaleH"); return 0; }
-    u32 tileX = (u32)smlua_to_integer(L, 6);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_render_texture_tile: invalid tileX"); return 0; }
-    u32 tileY = (u32)smlua_to_integer(L, 7);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_render_texture_tile: invalid tileY"); return 0; }
-    u32 tileW = (u32)smlua_to_integer(L, 8);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_render_texture_tile: invalid tileW"); return 0; }
-    u32 tileH = (u32)smlua_to_integer(L, 9);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_render_texture_tile: invalid tileH"); return 0; }
-
-    mxui_hud_render_texture_tile(texInfo, x, y, scaleW, scaleH, tileX, tileY, tileW, tileH);
-    return 0;
-}
-
-int smlua_mxui_hud_render_texture_interpolated(lua_State* L) {
-    if (L == NULL) { return 0; }
-    if (!smlua_functions_valid_param_count(L, 9)) { return 0; }
-
-    struct TextureInfo* texInfo = smlua_to_texture_info(L, 1);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_render_texture_interpolated: invalid texture"); return 0; }
-    f32 prevX = smlua_to_number(L, 2);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_render_texture_interpolated: invalid prevX"); return 0; }
-    f32 prevY = smlua_to_number(L, 3);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_render_texture_interpolated: invalid prevY"); return 0; }
-    f32 prevScaleW = smlua_to_number(L, 4);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_render_texture_interpolated: invalid prevScaleW"); return 0; }
-    f32 prevScaleH = smlua_to_number(L, 5);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_render_texture_interpolated: invalid prevScaleH"); return 0; }
-    f32 x = smlua_to_number(L, 6);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_render_texture_interpolated: invalid x"); return 0; }
-    f32 y = smlua_to_number(L, 7);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_render_texture_interpolated: invalid y"); return 0; }
-    f32 scaleW = smlua_to_number(L, 8);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_render_texture_interpolated: invalid scaleW"); return 0; }
-    f32 scaleH = smlua_to_number(L, 9);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_render_texture_interpolated: invalid scaleH"); return 0; }
-
-    mxui_hud_render_texture_interpolated(texInfo, prevX, prevY, prevScaleW, prevScaleH, x, y, scaleW, scaleH);
-    return 0;
-}
-
-int smlua_mxui_hud_render_texture_tile_interpolated(lua_State* L) {
-    if (L == NULL) { return 0; }
-    if (!smlua_functions_valid_param_count(L, 13)) { return 0; }
-
-    struct TextureInfo* texInfo = smlua_to_texture_info(L, 1);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_render_texture_tile_interpolated: invalid texture"); return 0; }
-    f32 prevX = smlua_to_number(L, 2);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_render_texture_tile_interpolated: invalid prevX"); return 0; }
-    f32 prevY = smlua_to_number(L, 3);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_render_texture_tile_interpolated: invalid prevY"); return 0; }
-    f32 prevScaleW = smlua_to_number(L, 4);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_render_texture_tile_interpolated: invalid prevScaleW"); return 0; }
-    f32 prevScaleH = smlua_to_number(L, 5);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_render_texture_tile_interpolated: invalid prevScaleH"); return 0; }
-    f32 x = smlua_to_number(L, 6);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_render_texture_tile_interpolated: invalid x"); return 0; }
-    f32 y = smlua_to_number(L, 7);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_render_texture_tile_interpolated: invalid y"); return 0; }
-    f32 scaleW = smlua_to_number(L, 8);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_render_texture_tile_interpolated: invalid scaleW"); return 0; }
-    f32 scaleH = smlua_to_number(L, 9);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_render_texture_tile_interpolated: invalid scaleH"); return 0; }
-    u32 tileX = (u32)smlua_to_integer(L, 10);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_render_texture_tile_interpolated: invalid tileX"); return 0; }
-    u32 tileY = (u32)smlua_to_integer(L, 11);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_render_texture_tile_interpolated: invalid tileY"); return 0; }
-    u32 tileW = (u32)smlua_to_integer(L, 12);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_render_texture_tile_interpolated: invalid tileW"); return 0; }
-    u32 tileH = (u32)smlua_to_integer(L, 13);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_render_texture_tile_interpolated: invalid tileH"); return 0; }
-
-    mxui_hud_render_texture_tile_interpolated(texInfo, prevX, prevY, prevScaleW, prevScaleH, x, y, scaleW, scaleH, tileX, tileY, tileW, tileH);
-    return 0;
-}
-
-int smlua_mxui_hud_render_rect(lua_State* L) {
-    if (L == NULL) { return 0; }
-    if (!smlua_functions_valid_param_count(L, 4)) { return 0; }
-
-    f32 x = smlua_to_number(L, 1);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_render_rect: invalid x"); return 0; }
-    f32 y = smlua_to_number(L, 2);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_render_rect: invalid y"); return 0; }
-    f32 width = smlua_to_number(L, 3);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_render_rect: invalid width"); return 0; }
-    f32 height = smlua_to_number(L, 4);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_render_rect: invalid height"); return 0; }
-
-    mxui_hud_render_rect(x, y, width, height);
-    return 0;
-}
-
-int smlua_mxui_hud_render_rect_interpolated(lua_State* L) {
-    if (L == NULL) { return 0; }
-    if (!smlua_functions_valid_param_count(L, 8)) { return 0; }
-
-    f32 prevX = smlua_to_number(L, 1);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_render_rect_interpolated: invalid prevX"); return 0; }
-    f32 prevY = smlua_to_number(L, 2);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_render_rect_interpolated: invalid prevY"); return 0; }
-    f32 prevWidth = smlua_to_number(L, 3);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_render_rect_interpolated: invalid prevWidth"); return 0; }
-    f32 prevHeight = smlua_to_number(L, 4);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_render_rect_interpolated: invalid prevHeight"); return 0; }
-    f32 x = smlua_to_number(L, 5);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_render_rect_interpolated: invalid x"); return 0; }
-    f32 y = smlua_to_number(L, 6);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_render_rect_interpolated: invalid y"); return 0; }
-    f32 width = smlua_to_number(L, 7);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_render_rect_interpolated: invalid width"); return 0; }
-    f32 height = smlua_to_number(L, 8);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_render_rect_interpolated: invalid height"); return 0; }
-
-    mxui_hud_render_rect_interpolated(prevX, prevY, prevWidth, prevHeight, x, y, width, height);
-    return 0;
-}
-
-int smlua_mxui_hud_set_scissor(lua_State* L) {
-    if (L == NULL) { return 0; }
-    if (!smlua_functions_valid_param_count(L, 4)) { return 0; }
-
-    f32 x = smlua_to_number(L, 1);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_set_scissor: invalid x"); return 0; }
-    f32 y = smlua_to_number(L, 2);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_set_scissor: invalid y"); return 0; }
-    f32 width = smlua_to_number(L, 3);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_set_scissor: invalid width"); return 0; }
-    f32 height = smlua_to_number(L, 4);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_set_scissor: invalid height"); return 0; }
-
-    mxui_hud_set_scissor(x, y, width, height);
-    return 0;
-}
-
-int smlua_mxui_hud_set_viewport(lua_State* L) {
-    if (L == NULL) { return 0; }
-    if (!smlua_functions_valid_param_count(L, 4)) { return 0; }
-
-    f32 x = smlua_to_number(L, 1);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_set_viewport: invalid x"); return 0; }
-    f32 y = smlua_to_number(L, 2);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_set_viewport: invalid y"); return 0; }
-    f32 width = smlua_to_number(L, 3);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_set_viewport: invalid width"); return 0; }
-    f32 height = smlua_to_number(L, 4);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_set_viewport: invalid height"); return 0; }
-
-    mxui_hud_set_viewport(x, y, width, height);
-    return 0;
-}
-
-int smlua_mxui_hud_reset_viewport(lua_State* L) {
-    if (L == NULL) { return 0; }
-    if (!smlua_functions_valid_param_count(L, 0)) { return 0; }
-    mxui_hud_reset_viewport();
-    return 0;
-}
-
-int smlua_mxui_hud_reset_scissor(lua_State* L) {
-    if (L == NULL) { return 0; }
-    if (!smlua_functions_valid_param_count(L, 0)) { return 0; }
-    mxui_hud_reset_scissor();
-    return 0;
-}
-
-int smlua_mxui_hud_render_line(lua_State* L) {
-    if (L == NULL) { return 0; }
-    if (!smlua_functions_valid_param_count(L, 5)) { return 0; }
-
-    f32 p1X = smlua_to_number(L, 1);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_render_line: invalid p1X"); return 0; }
-    f32 p1Y = smlua_to_number(L, 2);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_render_line: invalid p1Y"); return 0; }
-    f32 p2X = smlua_to_number(L, 3);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_render_line: invalid p2X"); return 0; }
-    f32 p2Y = smlua_to_number(L, 4);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_render_line: invalid p2Y"); return 0; }
-    f32 size = smlua_to_number(L, 5);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_render_line: invalid size"); return 0; }
-
-    mxui_hud_render_line(p1X, p1Y, p2X, p2Y, size);
-    return 0;
-}
-
-int smlua_mxui_hud_get_mouse_scroll_y(lua_State* L) {
-    if (L == NULL) { return 0; }
-    if (!smlua_functions_valid_param_count(L, 0)) { return 0; }
-    lua_pushnumber(L, mxui_hud_get_mouse_scroll_y());
-    return 1;
-}
-
-int smlua_mxui_hud_get_fov_coeff(lua_State* L) {
-    if (L == NULL) { return 0; }
-    if (!smlua_functions_valid_param_count(L, 0)) { return 0; }
-    lua_pushnumber(L, mxui_hud_get_fov_coeff());
-    return 1;
-}
-
-int smlua_mxui_hud_world_pos_to_screen_pos(lua_State* L) {
-    if (L == NULL) { return 0; }
-    if (!smlua_functions_valid_param_count(L, 2)) { return 0; }
-
-    extern void smlua_get_vec3f(Vec3f dest, int index);
-    extern void smlua_push_vec3f(Vec3f src, int index);
-
-    Vec3f pos;
-    smlua_get_vec3f(pos, 1);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_world_pos_to_screen_pos: invalid position"); return 0; }
-
-    Vec3f out;
-    smlua_get_vec3f(out, 2);
-    if (!gSmLuaConvertSuccess) { LOG_LUA_LINE("mxui_hud_world_pos_to_screen_pos: invalid output"); return 0; }
-
-    lua_pushboolean(L, mxui_hud_world_pos_to_screen_pos(pos, out));
-    smlua_push_vec3f(out, 2);
-    return 1;
-}
-
-int smlua_mxui_hud_is_pause_menu_created(lua_State* L) {
-    if (L == NULL) { return 0; }
-    if (!smlua_functions_valid_param_count(L, 0)) { return 0; }
-    lua_pushboolean(L, mxui_hud_is_pause_menu_created());
-    return 1;
-}
-
 void smlua_call_mod_menu_element_hook(struct LuaHookedModMenuElement* hooked, int index) {
     lua_State* L = gLuaState;
     if (L == NULL) { return; }
-    if (hooked == NULL || hooked->reference == 0) { return; }
 
     // push the callback onto the stack
     lua_rawgeti(L, LUA_REGISTRYINDEX, hooked->reference);
@@ -2227,9 +1462,6 @@ void smlua_call_mod_menu_element_hook(struct LuaHookedModMenuElement* hooked, in
         case MOD_MENU_ELEMENT_INPUTBOX:
             lua_pushstring(L, hooked->stringValue);
             break;
-        case MOD_MENU_ELEMENT_BIND:
-            smlua_mod_menu_push_bind_table(L, hooked->bindValue);
-            break;
         case MOD_MENU_ELEMENT_MAX:
             break;
     }
@@ -2239,7 +1471,6 @@ void smlua_call_mod_menu_element_hook(struct LuaHookedModMenuElement* hooked, in
         LOG_LUA("Failed to call the mod menu element callback: %s", hooked->name);
         return;
     }
-    lua_pop(L, 1);
 }
 
 
@@ -2331,16 +1562,12 @@ void smlua_clear_hooks(void) {
         struct LuaHookedModMenuElement* hooked = &gHookedModMenuElements[i];
         hooked->element = MOD_MENU_ELEMENT_TEXT;
         hooked->name[0] = '\0';
-        hooked->configKey[0] = '\0';
         hooked->boolValue = false;
         hooked->uintValue = 0;
         hooked->stringValue[0] = '\0';
         hooked->length = 0;
         hooked->sliderMin = 0;
         hooked->sliderMax = 0;
-        for (int j = 0; j < MAX_BINDS; j++) {
-            hooked->bindValue[j] = VK_INVALID;
-        }
         hooked->reference = 0;
         hooked->mod = NULL;
         hooked->modFile = NULL;
@@ -2392,61 +1619,9 @@ void smlua_bind_hooks(void) {
     smlua_bind_function(L, "hook_mod_menu_checkbox", smlua_hook_mod_menu_checkbox);
     smlua_bind_function(L, "hook_mod_menu_slider", smlua_hook_mod_menu_slider);
     smlua_bind_function(L, "hook_mod_menu_inputbox", smlua_hook_mod_menu_inputbox);
-    smlua_bind_function(L, "hook_mod_menu_bind", smlua_hook_mod_menu_bind);
-    smlua_bind_function(L, "mod_bind_pressed", smlua_mod_bind_pressed);
-    smlua_bind_function(L, "mod_bind_down", smlua_mod_bind_down);
-    smlua_bind_function(L, "mod_bind_released", smlua_mod_bind_released);
-    smlua_bind_function(L, "is_game_menu_open", smlua_is_game_menu_open);
-    smlua_bind_function(L, "is_character_select_menu_open", smlua_is_character_select_menu_open);
-    smlua_bind_function(L, "is_frontend_menu_open", smlua_is_frontend_menu_open);
-    smlua_bind_function(L, "game_menu_open", smlua_game_menu_open);
-    smlua_bind_function(L, "game_menu_close", smlua_game_menu_close);
-    smlua_bind_function(L, "game_menu_open_character_select", smlua_game_menu_open_character_select);
-    smlua_bind_function(L, "mxui_popup_create", smlua_mxui_popup_create);
-    smlua_bind_function(L, "mxui_popup_create_global", smlua_mxui_popup_create_global);
-    smlua_bind_function(L, "mxui_hud_set_resolution", smlua_mxui_hud_set_resolution);
-    smlua_bind_function(L, "mxui_hud_get_filter", smlua_mxui_hud_get_filter);
-    smlua_bind_function(L, "mxui_hud_set_filter", smlua_mxui_hud_set_filter);
-    smlua_bind_function(L, "mxui_hud_get_screen_width", smlua_mxui_hud_get_screen_width);
-    smlua_bind_function(L, "mxui_hud_get_screen_height", smlua_mxui_hud_get_screen_height);
-    smlua_bind_function(L, "mxui_hud_get_mouse_x", smlua_mxui_hud_get_mouse_x);
-    smlua_bind_function(L, "mxui_hud_get_mouse_y", smlua_mxui_hud_get_mouse_y);
-    smlua_bind_function(L, "mxui_hud_get_raw_mouse_x", smlua_mxui_hud_get_raw_mouse_x);
-    smlua_bind_function(L, "mxui_hud_get_raw_mouse_y", smlua_mxui_hud_get_raw_mouse_y);
-    smlua_bind_function(L, "mxui_hud_is_mouse_locked", smlua_mxui_hud_is_mouse_locked);
-    smlua_bind_function(L, "mxui_hud_set_mouse_locked", smlua_mxui_hud_set_mouse_locked);
-    smlua_bind_function(L, "mxui_hud_get_mouse_buttons_down", smlua_mxui_hud_get_mouse_buttons_down);
-    smlua_bind_function(L, "mxui_hud_get_mouse_buttons_pressed", smlua_mxui_hud_get_mouse_buttons_pressed);
-    smlua_bind_function(L, "mxui_hud_get_mouse_buttons_released", smlua_mxui_hud_get_mouse_buttons_released);
-    smlua_bind_function(L, "mxui_hud_get_mouse_scroll_x", smlua_mxui_hud_get_mouse_scroll_x);
-    smlua_bind_function(L, "mxui_hud_set_font", smlua_mxui_hud_set_font);
-    smlua_bind_function(L, "mxui_hud_get_font", smlua_mxui_hud_get_font);
-    smlua_bind_function(L, "mxui_hud_set_color", smlua_mxui_hud_set_color);
-    smlua_bind_function(L, "mxui_hud_get_color", smlua_mxui_hud_get_color);
-    smlua_bind_function(L, "mxui_hud_reset_color", smlua_mxui_hud_reset_color);
-    smlua_bind_function(L, "mxui_hud_set_rotation", smlua_mxui_hud_set_rotation);
-    smlua_bind_function(L, "mxui_hud_measure_text", smlua_mxui_hud_measure_text);
-    smlua_bind_function(L, "mxui_hud_print_text", smlua_mxui_hud_print_text);
-    smlua_bind_function(L, "mxui_hud_print_text_interpolated", smlua_mxui_hud_print_text_interpolated);
-    smlua_bind_function(L, "mxui_hud_render_texture", smlua_mxui_hud_render_texture);
-    smlua_bind_function(L, "mxui_hud_render_texture_tile", smlua_mxui_hud_render_texture_tile);
-    smlua_bind_function(L, "mxui_hud_render_texture_interpolated", smlua_mxui_hud_render_texture_interpolated);
-    smlua_bind_function(L, "mxui_hud_render_texture_tile_interpolated", smlua_mxui_hud_render_texture_tile_interpolated);
-    smlua_bind_function(L, "mxui_hud_render_rect", smlua_mxui_hud_render_rect);
-    smlua_bind_function(L, "mxui_hud_render_rect_interpolated", smlua_mxui_hud_render_rect_interpolated);
-    smlua_bind_function(L, "mxui_hud_render_line", smlua_mxui_hud_render_line);
-    smlua_bind_function(L, "mxui_hud_set_viewport", smlua_mxui_hud_set_viewport);
-    smlua_bind_function(L, "mxui_hud_reset_viewport", smlua_mxui_hud_reset_viewport);
-    smlua_bind_function(L, "mxui_hud_set_scissor", smlua_mxui_hud_set_scissor);
-    smlua_bind_function(L, "mxui_hud_reset_scissor", smlua_mxui_hud_reset_scissor);
-    smlua_bind_function(L, "mxui_hud_get_mouse_scroll_y", smlua_mxui_hud_get_mouse_scroll_y);
-    smlua_bind_function(L, "mxui_hud_get_fov_coeff", smlua_mxui_hud_get_fov_coeff);
-    smlua_bind_function(L, "mxui_hud_world_pos_to_screen_pos", smlua_mxui_hud_world_pos_to_screen_pos);
-    smlua_bind_function(L, "mxui_hud_is_pause_menu_created", smlua_mxui_hud_is_pause_menu_created);
     smlua_bind_function(L, "update_chat_command_description", smlua_update_chat_command_description);
     smlua_bind_function(L, "update_mod_menu_element_name", smlua_update_mod_menu_element_name);
     smlua_bind_function(L, "update_mod_menu_element_checkbox", smlua_update_mod_menu_element_checkbox);
     smlua_bind_function(L, "update_mod_menu_element_slider", smlua_update_mod_menu_element_slider);
     smlua_bind_function(L, "update_mod_menu_element_inputbox", smlua_update_mod_menu_element_inputbox);
-    smlua_bind_function(L, "update_mod_menu_element_bind", smlua_update_mod_menu_element_bind);
 }

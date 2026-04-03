@@ -25,8 +25,9 @@
 #include "game/first_person_cam.h"
 #include "game/bettercamera.h"
 #include "pc/lua/utils/smlua_misc_utils.h"
-#include "pc/mxui/mxui.h"
-#include "pc/mxui/mxui_hud.h"
+#include "pc/djui/djui.h"
+#include "pc/djui/djui_panel_pause.h"
+#include "pc/djui/djui_hud_utils.h"
 
 #define MAX_JOYBINDS 32
 #define MAX_MOUSEBUTTONS 8 // arbitrary
@@ -165,18 +166,21 @@ static inline void update_button(const int i, const bool new) {
     const bool pressed = !joy_buttons[i] && new;
     const bool unpressed = joy_buttons[i] && !new;
     joy_buttons[i] = new;
-    controller_set_key_state(VK_BASE_SDL_GAMEPAD + i, new);
     if (pressed) {
         last_joybutton = i;
+        djui_panel_pause_disconnect_key_update(VK_BASE_SDL_GAMEPAD + i);
+        djui_interactable_on_key_down(VK_BASE_SDL_GAMEPAD + i);
     }
-    (void)unpressed;
+    if (unpressed) {
+        djui_interactable_on_key_up(VK_BASE_SDL_GAMEPAD + i);
+    }
 }
 
 extern s16 gMenuMode;
 static void controller_sdl_read(OSContPad *pad) {
     if (!init_ok) { return; }
 
-    if ((gNewCamera.isMouse || get_first_person_enabled() || mxui_hud_is_mouse_locked()) && !is_game_paused() && !mxui_is_active() && WAPI.has_focus()) {
+    if ((gNewCamera.isMouse || get_first_person_enabled() || gDjuiHudLockMouse) && !is_game_paused() && !gDjuiPanelPauseCreated && !gDjuiInMainMenu && !gDjuiChatBoxFocus && !gDjuiConsoleFocus && WAPI.has_focus()) {
         controller_mouse_enter_relative();
     } else {
         controller_mouse_leave_relative();
@@ -185,11 +189,8 @@ static void controller_sdl_read(OSContPad *pad) {
     u32 mouse_prev = mouse_buttons;
     controller_mouse_read_relative();
     u32 mouse = mouse_buttons;
-    for (u32 i = 1; i < MAX_MOUSEBUTTONS; i++) {
-        controller_set_key_state(VK_BASE_SDL_MOUSE + i, (mouse & SDL_BUTTON(i)) != 0);
-    }
 
-    if (!mxui_is_active()) {
+    if (!gInteractableOverridePad) {
         for (u32 i = 0; i < num_mouse_binds; ++i)
             if (mouse & SDL_BUTTON(mouse_binds[i][0]))
                 pad->button |= mouse_binds[i][1];
@@ -202,15 +203,11 @@ static void controller_sdl_read(OSContPad *pad) {
         SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, sBackgroundGamepad ? "1" : "0");
     }
 
-    if (configDisableGamepads) {
-        controller_clear_key_states(VK_BASE_SDL_GAMEPAD, VK_OFS_SDL_MOUSE);
-        return;
-    }
+    if (configDisableGamepads) { return; }
 
     SDL_GameControllerUpdate();
 
     if (sdl_cntrl != NULL && !SDL_GameControllerGetAttached(sdl_cntrl)) {
-        controller_clear_key_states(VK_BASE_SDL_GAMEPAD, VK_OFS_SDL_MOUSE);
         SDL_HapticClose(sdl_haptic);
         SDL_GameControllerClose(sdl_cntrl);
         sdl_cntrl = NULL;
@@ -231,11 +228,6 @@ static void controller_sdl_read(OSContPad *pad) {
             sdl_joystick = SDL_JoystickOpen(configGamepadNumber);
             if (!sdl_joystick) { return; }
         }
-    }
-
-    if (sdl_cntrl == NULL && sdl_joystick == NULL) {
-        controller_clear_key_states(VK_BASE_SDL_GAMEPAD, VK_OFS_SDL_MOUSE);
-        return;
     }
 
     int16_t leftx = 0, lefty = 0, rightx = 0, righty = 0;

@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include "../network.h"
-#include "pc/mxui/mxui_exports.h"
+#include "pc/djui/djui.h"
 #include "pc/debuglog.h"
 
 #define ARR_SIZE(_X) (sizeof(_X) / sizeof(_X[0]))
@@ -96,6 +96,9 @@ void network_receive_chat(struct Packet* p) {
     if (!np) { return; }
     np->gag = np->gag || found_match(remoteMessage);
     if (np->gag) { return; }
+
+    // add the message
+    djui_chat_message_create_from(globalIndex, remoteMessage);
 
     if (gNetworkSystem && gNetworkSystem->get_id_str && np->connected && strlen(np->name) > 0) {
         LOG_CONSOLE("[%s] %s: %s", gNetworkSystem->get_id_str(np->localIndex), np->name, remoteMessage);

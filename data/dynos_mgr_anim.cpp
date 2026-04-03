@@ -1,7 +1,6 @@
 #include "dynos.cpp.h"
 extern "C" {
 #include "object_fields.h"
-#include "game/game_init.h"
 #include "game/level_update.h"
 #include "game/object_list_processor.h"
 #include "pc/configfile.h"

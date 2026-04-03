@@ -2,7 +2,6 @@
 #include "mods.h"
 #include "mods_utils.h"
 #include "mod_cache.h"
-#include "mod_bindings.h"
 #include "data/dynos.c.h"
 #include "pc/debuglog.h"
 #include "pc/loading.h"
@@ -184,14 +183,28 @@ static void mods_sort(struct Mods* mods) {
         return;
     }
 
+    // Keep Character Select and the MoonOS bridge loaded before pack scripts.
+    // Pack folders can then use the MoonOS aliases without racing the core API.
     // By default, this is the alphabetical order on name
     for (s32 i = 1; i < mods->entryCount; ++i) {
         struct Mod* mod = mods->entries[i];
         for (s32 j = 0; j < i; ++j) {
             struct Mod* mod2 = mods->entries[j];
+            s32 modPriority = 100;
+            s32 mod2Priority = 100;
             char* name = str_remove_color_codes(mod->name);
             char* name2 = str_remove_color_codes(mod2->name);
-            if (strcmp(name, name2) < 0) {
+
+            if (mod->category && strcmp(mod->category, "cs") == 0) { modPriority = 0; }
+            if (mod2->category && strcmp(mod2->category, "cs") == 0) { mod2Priority = 0; }
+
+            if (!strcmp(mod->relativePath, DYNOS_RES_FOLDER) || !strcmp(mod->relativePath, DYNOS_RES_FOLDER ".lua")) { modPriority = 10; }
+            if (!strcmp(mod2->relativePath, DYNOS_RES_FOLDER) || !strcmp(mod2->relativePath, DYNOS_RES_FOLDER ".lua")) { mod2Priority = 10; }
+
+            if (str_starts_with(mod->relativePath, "packs/")) { modPriority = 200; }
+            if (str_starts_with(mod2->relativePath, "packs/")) { mod2Priority = 200; }
+
+            if ((modPriority < mod2Priority) || (modPriority == mod2Priority && strcmp(name, name2) < 0)) {
                 mods->entries[i] = mod2;
                 mods->entries[j] = mod;
                 mod = mods->entries[i];
@@ -209,6 +222,107 @@ static u32 mods_count_directory(char* modsBasePath) {
     while ((dir = readdir(d)) != NULL) pathCount++;
     closedir(d);
     return pathCount;
+}
+
+static bool mods_should_skip_moonos_dir(const char* name) {
+    return (name == NULL || name[0] == '\0' || name[0] == '.' || name[0] == '_');
+}
+
+static bool mods_load_moonos_pack_scripts_recursive(struct Mods* mods, char* moonosBasePath, const char* relativePath) {
+    char scanPath[SYS_MAX_PATH] = { 0 };
+    struct dirent* dir = NULL;
+    DIR* d = NULL;
+
+    if (mods == NULL || moonosBasePath == NULL || moonosBasePath[0] == '\0') {
+        return true;
+    }
+
+    if (!concat_path(scanPath, moonosBasePath, (char*) relativePath)) {
+        LOG_ERROR("Failed to concat MoonOS packs path '%s' + '%s'", moonosBasePath, relativePath);
+        return true;
+    }
+
+    normalize_path(scanPath);
+    if (!fs_sys_dir_exists(scanPath)) {
+        return true;
+    }
+
+    d = opendir(scanPath);
+    if (!d) {
+        LOG_ERROR("Could not open MoonOS packs directory '%s'", scanPath);
+        return true;
+    }
+
+    while ((dir = readdir(d)) != NULL) {
+        char packPath[SYS_MAX_PATH] = { 0 };
+        char mainLuaPath[SYS_MAX_PATH] = { 0 };
+        char childRelative[SYS_MAX_PATH] = { 0 };
+
+        if (mods_should_skip_moonos_dir(dir->d_name)) {
+            continue;
+        }
+
+        if (relativePath[0] != '\0') {
+            if (snprintf(childRelative, sizeof(childRelative), "%s/%s", relativePath, dir->d_name) < 0) {
+                LOG_ERROR("Failed to build MoonOS child path '%s/%s'", relativePath, dir->d_name);
+                continue;
+            }
+        } else {
+            if (snprintf(childRelative, sizeof(childRelative), "%s", dir->d_name) < 0) {
+                LOG_ERROR("Failed to build MoonOS child path '%s'", dir->d_name);
+                continue;
+            }
+        }
+
+        if (!concat_path(packPath, moonosBasePath, childRelative)) {
+            LOG_ERROR("Failed to concat MoonOS pack path '%s' + '%s'", moonosBasePath, childRelative);
+            continue;
+        }
+        normalize_path(packPath);
+        if (!fs_sys_dir_exists(packPath)) {
+            continue;
+        }
+
+        if (!concat_path(mainLuaPath, packPath, "main.lua")) {
+            LOG_ERROR("Failed to concat MoonOS pack main.lua path for '%s'", packPath);
+            continue;
+        }
+        if (fs_sys_file_exists(mainLuaPath)) {
+            if (!mod_load(mods, moonosBasePath, childRelative)) {
+                closedir(d);
+                return false;
+            }
+            continue;
+        }
+
+        if (!mods_load_moonos_pack_scripts_recursive(mods, moonosBasePath, childRelative)) {
+            closedir(d);
+            return false;
+        }
+    }
+
+    closedir(d);
+    return true;
+}
+
+static void mods_load_moonos_pack_scripts(struct Mods* mods, char* moonosBasePath, UNUSED bool isUserModPath) {
+    char packsBasePath[SYS_MAX_PATH] = { 0 };
+
+    if (mods == NULL || moonosBasePath == NULL || moonosBasePath[0] == '\0') {
+        return;
+    }
+
+    if (!concat_path(packsBasePath, moonosBasePath, "packs")) {
+        LOG_ERROR("Failed to concat MoonOS packs path '%s'", moonosBasePath);
+        return;
+    }
+
+    normalize_path(packsBasePath);
+    if (!fs_sys_dir_exists(packsBasePath)) {
+        return;
+    }
+
+    (void) mods_load_moonos_pack_scripts_recursive(mods, moonosBasePath, "packs");
 }
 
 static void mods_load(struct Mods* mods, char* modsBasePath, UNUSED bool isUserModPath) {
@@ -289,8 +403,28 @@ void mods_refresh_local(void) {
     if (hasUserPath) { mods_load(&gLocalMods, userModPath, true); }
 
     char defaultModsPath[SYS_MAX_PATH] = { 0 };
-    snprintf(defaultModsPath, SYS_MAX_PATH, "%s/%s", sys_resource_path(), MOD_DIRECTORY);
+    snprintf(defaultModsPath, SYS_MAX_PATH, "%s/%s", sys_package_path(), MOD_DIRECTORY);
     mods_load(&gLocalMods, defaultModsPath, false);
+
+    char userMoonosPath[SYS_MAX_PATH] = { 0 };
+    if (snprintf(userMoonosPath, SYS_MAX_PATH - 1, "%s", fs_get_write_path(DYNOS_RES_FOLDER)) >= 0) {
+        if (!fs_sys_dir_exists(userMoonosPath)) {
+            fs_sys_mkdir(userMoonosPath);
+        }
+        mods_load_moonos_pack_scripts(&gLocalMods, userMoonosPath, true);
+    }
+
+    char defaultMoonosPath[SYS_MAX_PATH] = { 0 };
+    snprintf(defaultMoonosPath, SYS_MAX_PATH, "%s/%s", sys_package_path(), DYNOS_RES_FOLDER);
+    mods_load_moonos_pack_scripts(&gLocalMods, defaultMoonosPath, false);
+
+    char legacyUserMoonosPath[SYS_MAX_PATH] = { 0 };
+    snprintf(legacyUserMoonosPath, SYS_MAX_PATH, "%s/%s", fs_get_write_path(MOD_DIRECTORY), DYNOS_RES_FOLDER);
+    mods_load_moonos_pack_scripts(&gLocalMods, legacyUserMoonosPath, true);
+
+    char legacyDefaultMoonosPath[SYS_MAX_PATH] = { 0 };
+    snprintf(legacyDefaultMoonosPath, SYS_MAX_PATH, "%s/%s/%s", sys_package_path(), MOD_DIRECTORY, DYNOS_RES_FOLDER);
+    mods_load_moonos_pack_scripts(&gLocalMods, legacyDefaultMoonosPath, false);
 
     // sort
     mods_sort(&gLocalMods);
@@ -313,15 +447,6 @@ void mods_enable(char* relativePath) {
         if (!strcmp(relativePath, mod->relativePath)) {
             mod->enabled = true;
             break;
-        }
-    }
-}
-
-void mods_disable_all(void) {
-    for (unsigned int i = 0; i < gLocalMods.entryCount; i++) {
-        struct Mod* mod = gLocalMods.entries[i];
-        if (mod != NULL) {
-            mod->enabled = false;
         }
     }
 }
@@ -371,7 +496,6 @@ void mods_clear(struct Mods* mods) {
 void mods_shutdown(void) {
     mod_cache_save();
     mod_cache_shutdown();
-    mod_bindings_shutdown();
     mods_clear(&gActiveMods);
     mods_clear(&gRemoteMods);
     mods_clear(&gLocalMods);

@@ -43,13 +43,17 @@
 #include "pc/network/socket/socket.h"
 #include "pc/network/network_player.h"
 #include "pc/update_checker.h"
+#include "pc/djui/djui.h"
+#include "pc/djui/djui_unicode.h"
+#include "pc/djui/djui_panel.h"
+#include "pc/djui/djui_panel_modlist.h"
+#include "pc/djui/djui_ctx_display.h"
+#include "pc/djui/djui_fps_display.h"
+#include "pc/djui/djui_lua_profiler.h"
+#include "pc/djui/djui_sm64dx.h"
 #include "pc/debuglog.h"
 #include "pc/utils/misc.h"
 #include "pc/mods/mods.h"
-#include "pc/startup_experience.h"
-#include "pc/mxui/mxui_language.h"
-#include "pc/mxui/mxui_render.h"
-#include "pc/mxui/mxui_runtime.h"
 
 #include "debug_context.h"
 #include "menu/intro_geo.h"
@@ -107,6 +111,15 @@ u8 gLuaVolumeLevel = 127;
 u8 gLuaVolumeSfx = 127;
 u8 gLuaVolumeEnv = 127;
 
+static void set_resource_working_directory(void) {
+    const char *resourcePath = sys_resource_path();
+    if (!resourcePath || resourcePath[0] == '\0') { return; }
+
+    if (chdir(resourcePath) != 0) {
+        LOG_ERROR("Could not set working directory to '%s'", resourcePath);
+    }
+}
+
 static struct AudioAPI *audio_api;
 struct GfxWindowManagerAPI *wm_api = &WAPI;
 
@@ -139,8 +152,8 @@ extern void patch_hud_before(void);
 extern void patch_paintings_before(void);
 extern void patch_bubble_particles_before(void);
 extern void patch_snow_particles_before(void);
-extern void patch_mxui_before(void);
-extern void patch_mxui_hud_before(void);
+extern void patch_djui_before(void);
+extern void patch_djui_hud_before(void);
 extern void patch_scroll_targets_before(void);
 
 extern void patch_mtx_interpolated(f32 delta);
@@ -151,8 +164,8 @@ extern void patch_hud_interpolated(f32 delta);
 extern void patch_paintings_interpolated(f32 delta);
 extern void patch_bubble_particles_interpolated(f32 delta);
 extern void patch_snow_particles_interpolated(f32 delta);
-extern void patch_mxui_interpolated(f32 delta);
-extern void patch_mxui_hud(f32 delta);
+extern void patch_djui_interpolated(f32 delta);
+extern void patch_djui_hud(f32 delta);
 extern void patch_scroll_targets_interpolated(f32 delta);
 
 static void patch_interpolations_before(void) {
@@ -164,8 +177,8 @@ static void patch_interpolations_before(void) {
     patch_paintings_before();
     patch_bubble_particles_before();
     patch_snow_particles_before();
-    patch_mxui_before();
-    patch_mxui_hud_before();
+    patch_djui_before();
+    patch_djui_hud_before();
     patch_scroll_targets_before();
 }
 
@@ -178,13 +191,14 @@ static inline void patch_interpolations(f32 delta) {
     patch_paintings_interpolated(delta);
     patch_bubble_particles_interpolated(delta);
     patch_snow_particles_interpolated(delta);
-    patch_mxui_interpolated(delta);
-    patch_mxui_hud(delta);
+    patch_djui_interpolated(delta);
+    patch_djui_hud(delta);
     patch_scroll_targets_interpolated(delta);
 }
 
 static void compute_fps(f64 curTime) {
-    (void)round((f64) sDrawnFrames / MAX(0.001, curTime - sFpsTimeLast));
+    u32 fps = round((f64) sDrawnFrames / MAX(0.001, curTime - sFpsTimeLast));
+    djui_fps_display_update(fps);
     sFpsTimeLast = curTime;
     sDrawnFrames = 0;
 }
@@ -352,7 +366,7 @@ void produce_one_frame(void) {
     CTX_EXTENT(CTX_GAME_LOOP, game_loop_one_iteration);
 
     CTX_EXTENT(CTX_SMLUA, smlua_update);
-    controller_finalize_frame();
+    sm64dx_profile_update();
 
     // If we aren't threaded
     if (gAudioThread.state == INVALID) {
@@ -373,7 +387,7 @@ void produce_one_dummy_frame(void (*callback)(), u8 clearColorR, u8 clearColorG,
     config_gfx_pool();
     init_render_image();
     create_dl_ortho_matrix();
-    mxui_render_displaylist_begin();
+    djui_gfx_displaylist_begin();
 
     // fix scaling issues
     gSPViewport(gDisplayListHead++, VIRTUAL_TO_PHYSICAL(&gViewportFullscreen));
@@ -390,7 +404,7 @@ void produce_one_dummy_frame(void (*callback)(), u8 clearColorR, u8 clearColorG,
     callback();
 
     // render frame
-    mxui_render_displaylist_end();
+    djui_gfx_displaylist_end();
     end_master_display_list();
     alloc_display_list(0);
     gfx_run((Gfx*) gGfxSPTask->task.t.data_ptr); // send_display_list
@@ -417,7 +431,6 @@ void audio_shutdown(void) {
 
 void game_deinit(void) {
     if (gGameInited) { configfile_save(configfile_name()); }
-    startup_experience_end_session();
     controller_shutdown();
     audio_custom_shutdown();
     audio_shutdown();
@@ -426,7 +439,8 @@ void game_deinit(void) {
     smlua_shutdown();
     smlua_audio_custom_deinit();
     mods_shutdown();
-    mxui_runtime_shutdown();
+    sm64dx_profile_shutdown();
+    djui_shutdown();
     gfx_shutdown();
     gGameInited = false;
 }
@@ -439,7 +453,7 @@ void game_exit(void) {
 
 void* main_game_init(UNUSED void* dummy) {
     // load language
-    if (!mxui_language_init(configLanguage)) { snprintf(configLanguage, MAX_CONFIG_STRING, "%s", ""); }
+    if (!djui_language_init(configLanguage)) { snprintf(configLanguage, MAX_CONFIG_STRING, "%s", ""); }
 
     LOADING_SCREEN_MUTEX(loading_screen_set_segment_text("Loading"));
     dynos_gfx_init();
@@ -507,7 +521,6 @@ int main(int argc, char *argv[]) {
     }
 #endif
 
-    startup_experience_bootstrap();
     configfile_load();
 
     legacy_folder_handler();
@@ -533,7 +546,8 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    startup_experience_begin_session();
+    set_resource_working_directory();
+    sm64dx_profile_init();
 
     // start the thread for setting up the game
 #ifdef LOADING_SCREEN_SUPPORTED
@@ -568,13 +582,15 @@ int main(int argc, char *argv[]) {
     loading_screen_reset();
 #endif
 
-    // initialize mxui
-    mxui_runtime_init();
-    mxui_runtime_open_main_flow();
+    // initialize djui
+    djui_init();
+    djui_unicode_init();
+    djui_init_late();
+    djui_console_message_dequeue();
 
     show_update_popup();
 
-    // this fork only exposes offline play from the front end
+    // sm64dx boots offline-only.
     network_init(NT_NONE, false);
 
     // main loop
@@ -592,6 +608,10 @@ int main(int argc, char *argv[]) {
 #endif
         CTX_END(CTX_TOTAL);
 
+#ifdef DEVELOPMENT
+        djui_ctx_display_update();
+#endif
+        djui_lua_profiler_update();
     }
 
     return 0;

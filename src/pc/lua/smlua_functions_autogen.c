@@ -12,17 +12,17 @@
 #include "src/game/mario_step.h"
 #include "src/game/mario.h"
 #include "src/game/rumble_init.h"
-#include "src/pc/mxui/mxui_popup.h"
+#include "src/pc/djui/djui_popup.h"
 #include "src/pc/network/network_utils.h"
-#include "src/pc/mxui/mxui_console.h"
-#include "src/pc/mxui/mxui_exports.h"
-#include "src/pc/mxui/mxui_language.h"
+#include "src/pc/djui/djui_console.h"
+#include "src/pc/djui/djui_chat_message.h"
+#include "src/pc/djui/djui_language.h"
 #include "src/game/interaction.h"
 #include "src/game/level_info.h"
 #include "src/game/save_file.h"
 #include "src/game/sound_init.h"
-#include "src/pc/mxui/mxui_hud.h"
-#include "src/pc/mxui/mxui_theme.h"
+#include "src/pc/djui/djui_hud_utils.h"
+#include "src/pc/djui/djui_panel_menu.h"
 #include "src/pc/network/network_player.h"
 #include "src/pc/network/lag_compensation.h"
 #include "include/behavior_table.h"
@@ -12418,7 +12418,7 @@ int smlua_func_djui_console_toggle(UNUSED lua_State* L) {
     }
 
 
-    mxui_console_toggle();
+    djui_console_toggle();
 
     return 1;
 }
@@ -13202,7 +13202,7 @@ int smlua_func_get_current_fov(UNUSED lua_State* L) {
     }
 
 
-    lua_pushnumber(L, mxui_hud_get_current_fov());
+    lua_pushnumber(L, get_current_fov());
 
     return 1;
 }
@@ -13316,7 +13316,7 @@ int smlua_func_djui_menu_get_rainbow_string_color(lua_State* L) {
     int color = smlua_to_integer(L, 1);
     if (!gSmLuaConvertSuccess) { LOG_LUA("Failed to convert parameter %u for function '%s'", 1, "djui_menu_get_rainbow_string_color"); return 0; }
 
-    lua_pushstring(L, mxui_theme_get_rainbow_string_color(color));
+    lua_pushstring(L, djui_menu_get_rainbow_string_color(color));
 
     return 1;
 }
@@ -37734,18 +37734,59 @@ void smlua_bind_functions_autogen(void) {
     smlua_bind_function(L, "djui_console_toggle", smlua_func_djui_console_toggle);
 
     // djui_hud_utils.h
-    // DJUI HUD Lua bindings removed for SM64DX MXUI-only runtime.
+    smlua_bind_function(L, "djui_hud_get_resolution", smlua_func_djui_hud_get_resolution);
+    smlua_bind_function(L, "djui_hud_set_resolution", smlua_func_djui_hud_set_resolution);
+    smlua_bind_function(L, "djui_hud_get_filter", smlua_func_djui_hud_get_filter);
+    smlua_bind_function(L, "djui_hud_set_filter", smlua_func_djui_hud_set_filter);
+    smlua_bind_function(L, "djui_hud_get_font", smlua_func_djui_hud_get_font);
+    smlua_bind_function(L, "djui_hud_set_font", smlua_func_djui_hud_set_font);
+    smlua_bind_function(L, "djui_hud_get_color", smlua_func_djui_hud_get_color);
+    smlua_bind_function(L, "djui_hud_set_color", smlua_func_djui_hud_set_color);
+    smlua_bind_function(L, "djui_hud_reset_color", smlua_func_djui_hud_reset_color);
+    smlua_bind_function(L, "djui_hud_get_rotation", smlua_func_djui_hud_get_rotation);
+    smlua_bind_function(L, "djui_hud_set_rotation", smlua_func_djui_hud_set_rotation);
+    smlua_bind_function(L, "djui_hud_set_rotation_interpolated", smlua_func_djui_hud_set_rotation_interpolated);
+    smlua_bind_function(L, "djui_hud_get_screen_width", smlua_func_djui_hud_get_screen_width);
+    smlua_bind_function(L, "djui_hud_get_screen_height", smlua_func_djui_hud_get_screen_height);
+    smlua_bind_function(L, "djui_hud_get_mouse_x", smlua_func_djui_hud_get_mouse_x);
+    smlua_bind_function(L, "djui_hud_get_mouse_y", smlua_func_djui_hud_get_mouse_y);
+    smlua_bind_function(L, "djui_hud_get_raw_mouse_x", smlua_func_djui_hud_get_raw_mouse_x);
+    smlua_bind_function(L, "djui_hud_get_raw_mouse_y", smlua_func_djui_hud_get_raw_mouse_y);
+    smlua_bind_function(L, "djui_hud_is_mouse_locked", smlua_func_djui_hud_is_mouse_locked);
+    smlua_bind_function(L, "djui_hud_set_mouse_locked", smlua_func_djui_hud_set_mouse_locked);
+    smlua_bind_function(L, "djui_hud_get_mouse_buttons_down", smlua_func_djui_hud_get_mouse_buttons_down);
+    smlua_bind_function(L, "djui_hud_get_mouse_buttons_pressed", smlua_func_djui_hud_get_mouse_buttons_pressed);
+    smlua_bind_function(L, "djui_hud_get_mouse_buttons_released", smlua_func_djui_hud_get_mouse_buttons_released);
+    smlua_bind_function(L, "djui_hud_get_mouse_scroll_x", smlua_func_djui_hud_get_mouse_scroll_x);
+    smlua_bind_function(L, "djui_hud_get_mouse_scroll_y", smlua_func_djui_hud_get_mouse_scroll_y);
+    smlua_bind_function(L, "djui_hud_set_viewport", smlua_func_djui_hud_set_viewport);
+    smlua_bind_function(L, "djui_hud_reset_viewport", smlua_func_djui_hud_reset_viewport);
+    smlua_bind_function(L, "djui_hud_set_scissor", smlua_func_djui_hud_set_scissor);
+    smlua_bind_function(L, "djui_hud_reset_scissor", smlua_func_djui_hud_reset_scissor);
+    smlua_bind_function(L, "djui_hud_measure_text", smlua_func_djui_hud_measure_text);
+    smlua_bind_function(L, "djui_hud_print_text", smlua_func_djui_hud_print_text);
+    smlua_bind_function(L, "djui_hud_print_text_interpolated", smlua_func_djui_hud_print_text_interpolated);
+    smlua_bind_function(L, "djui_hud_render_texture", smlua_func_djui_hud_render_texture);
+    smlua_bind_function(L, "djui_hud_render_texture_tile", smlua_func_djui_hud_render_texture_tile);
+    smlua_bind_function(L, "djui_hud_render_texture_interpolated", smlua_func_djui_hud_render_texture_interpolated);
+    smlua_bind_function(L, "djui_hud_render_texture_tile_interpolated", smlua_func_djui_hud_render_texture_tile_interpolated);
+    smlua_bind_function(L, "djui_hud_render_rect", smlua_func_djui_hud_render_rect);
+    smlua_bind_function(L, "djui_hud_render_rect_interpolated", smlua_func_djui_hud_render_rect_interpolated);
+    smlua_bind_function(L, "djui_hud_render_line", smlua_func_djui_hud_render_line);
     smlua_bind_function(L, "get_current_fov", smlua_func_get_current_fov);
-    // DJUI HUD Lua bindings removed for SM64DX MXUI-only runtime.
+    smlua_bind_function(L, "djui_hud_get_fov_coeff", smlua_func_djui_hud_get_fov_coeff);
+    smlua_bind_function(L, "djui_hud_world_pos_to_screen_pos", smlua_func_djui_hud_world_pos_to_screen_pos);
+    smlua_bind_function(L, "djui_hud_is_pause_menu_created", smlua_func_djui_hud_is_pause_menu_created);
+    smlua_bind_function(L, "djui_open_pause_menu", smlua_func_djui_open_pause_menu);
 
     // djui_language.h
-    // DJUI language Lua binding removed for SM64DX MXUI-only runtime.
+    smlua_bind_function(L, "djui_language_get", smlua_func_djui_language_get);
 
     // djui_panel_menu.h
     smlua_bind_function(L, "djui_menu_get_rainbow_string_color", smlua_func_djui_menu_get_rainbow_string_color);
 
     // djui_popup.h
-    // DJUI popup Lua binding removed for SM64DX MXUI-only runtime.
+    smlua_bind_function(L, "djui_popup_create", smlua_func_djui_popup_create);
 
     // external.h
     smlua_bind_function(L, "play_sound", smlua_func_play_sound);
@@ -38854,7 +38895,7 @@ void smlua_bind_functions_autogen(void) {
     smlua_bind_function(L, "get_area_update_counter", smlua_func_get_area_update_counter);
     smlua_bind_function(L, "get_temp_s32_pointer", smlua_func_get_temp_s32_pointer);
     smlua_bind_function(L, "deref_s32_pointer", smlua_func_deref_s32_pointer);
-    // DJUI popup Lua binding removed for SM64DX MXUI-only runtime.
+    smlua_bind_function(L, "djui_popup_create_global", smlua_func_djui_popup_create_global);
     smlua_bind_function(L, "djui_is_popup_disabled", smlua_func_djui_is_popup_disabled);
     smlua_bind_function(L, "djui_set_popup_disabled_override", smlua_func_djui_set_popup_disabled_override);
     smlua_bind_function(L, "djui_reset_popup_disabled_override", smlua_func_djui_reset_popup_disabled_override);

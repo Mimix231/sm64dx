@@ -18,8 +18,7 @@
 #include "crash_handler.h"
 #include "network/moderator_list.h"
 #include "debuglog.h"
-#include "mxui/mxui.h"
-#include "mxui/mxui_font.h"
+#include "djui/djui_hud_utils.h"
 #include "game/save_file.h"
 #include "pc/network/network_player.h"
 #include "pc/pc_main.h"
@@ -124,7 +123,6 @@ unsigned int configKeyConsole[MAX_BINDS]          = { 0x0029,     0x003B,     VK
 unsigned int configKeyPrevPage[MAX_BINDS]         = { 0x0016,     VK_INVALID, VK_INVALID };
 unsigned int configKeyNextPage[MAX_BINDS]         = { 0x0018,     VK_INVALID, VK_INVALID };
 unsigned int configKeyDisconnect[MAX_BINDS]       = { VK_INVALID, VK_INVALID, VK_INVALID };
-unsigned int configKeyGameMenu[MAX_BINDS]         = { 0x0001,     VK_INVALID, VK_INVALID };
 unsigned int configStickDeadzone                  = 16;
 unsigned int configRumbleStrength                 = 50;
 unsigned int configGamepadNumber                  = 0;
@@ -168,8 +166,6 @@ bool         configCtxProfiler                    = false;
 char         configPlayerName[MAX_CONFIG_STRING]  = "";
 unsigned int configPlayerModel                    = 0;
 struct PlayerPalette configPlayerPalette          = { { { 0x00, 0x00, 0xff }, { 0xff, 0x00, 0x00 }, { 0xff, 0xff, 0xff }, { 0x72, 0x1c, 0x0e }, { 0x73, 0x06, 0x00 }, { 0xfe, 0xc1, 0x79 }, { 0xff, 0x00, 0x00 }, { 0xff, 0x00, 0x00 } } };
-char         configPlayerMoonosPack[MAX_CONFIG_STRING] = "";
-char         configPlayerMoonosGeo[MAX_CONFIG_STRING]  = "";
 // coop settings
 unsigned int configAmountOfPlayers                = MAX_PLAYERS;
 bool         configBubbleDeath                    = true;
@@ -196,17 +192,13 @@ char         configLanguage[MAX_CONFIG_STRING]    = "";
 bool         configForce4By3                      = false;
 bool         configDynosLocalPlayerModelOnly      = false;
 unsigned int configPvpType                        = PLAYER_PVP_CLASSIC;
-bool         configFirstBootCompleted             = false;
-unsigned int configAccessibilityPreset            = 1;
-bool         configReduceCameraShake              = false;
-bool         configReduceHudFlash                 = false;
 // CoopNet settings
 char         configCoopNetIp[MAX_CONFIG_STRING]   = DEFAULT_COOPNET_IP;
 unsigned int configCoopNetPort                    = DEFAULT_COOPNET_PORT;
 char         configPassword[MAX_CONFIG_STRING]    = "";
 char         configDestId[MAX_CONFIG_STRING]      = "0";
 // DJUI settings
-unsigned int configDjuiTheme                      = 0;
+unsigned int configDjuiTheme                      = DJUI_THEME_DARK;
 #ifdef HANDHELD
 bool         configDjuiThemeCenter                = false;
 #else
@@ -274,7 +266,6 @@ static const struct ConfigOption options[] = {
     {.name = "key_prev",                       .type = CONFIG_TYPE_BIND, .uintValue = configKeyPrevPage},
     {.name = "key_next",                       .type = CONFIG_TYPE_BIND, .uintValue = configKeyNextPage},
     {.name = "key_disconnect",                 .type = CONFIG_TYPE_BIND, .uintValue = configKeyDisconnect},
-    {.name = "key_game_menu",                  .type = CONFIG_TYPE_BIND, .uintValue = configKeyGameMenu},
     {.name = "stick_deadzone",                 .type = CONFIG_TYPE_UINT, .uintValue = &configStickDeadzone},
     {.name = "rumble_strength",                .type = CONFIG_TYPE_UINT, .uintValue = &configRumbleStrength},
     {.name = "gamepad_number",                 .type = CONFIG_TYPE_UINT, .uintValue = &configGamepadNumber},
@@ -326,8 +317,6 @@ static const struct ConfigOption options[] = {
     // player settings
     {.name = "coop_player_name",               .type = CONFIG_TYPE_STRING, .stringValue = (char*)&configPlayerName, .maxStringLength = MAX_CONFIG_STRING},
     {.name = "coop_player_model",              .type = CONFIG_TYPE_UINT,   .uintValue   = &configPlayerModel},
-    {.name = "dx_player_moonos_pack",          .type = CONFIG_TYPE_STRING, .stringValue = (char*)&configPlayerMoonosPack, .maxStringLength = MAX_CONFIG_STRING},
-    {.name = "dx_player_moonos_geo",           .type = CONFIG_TYPE_STRING, .stringValue = (char*)&configPlayerMoonosGeo, .maxStringLength = MAX_CONFIG_STRING},
     {.name = "coop_player_palette_pants",      .type = CONFIG_TYPE_COLOR,  .colorValue  = &configPlayerPalette.parts[PANTS]},
     {.name = "coop_player_palette_shirt",      .type = CONFIG_TYPE_COLOR,  .colorValue  = &configPlayerPalette.parts[SHIRT]},
     {.name = "coop_player_palette_gloves",     .type = CONFIG_TYPE_COLOR,  .colorValue  = &configPlayerPalette.parts[GLOVES]},
@@ -362,10 +351,6 @@ static const struct ConfigOption options[] = {
     {.name = "language",                       .type = CONFIG_TYPE_STRING, .stringValue = (char*)&configLanguage, .maxStringLength = MAX_CONFIG_STRING},
     {.name = "force_4by3",                     .type = CONFIG_TYPE_BOOL,   .boolValue   = &configForce4By3},
     {.name = "dynos_local_player_model_only",  .type = CONFIG_TYPE_BOOL,   .boolValue   = &configDynosLocalPlayerModelOnly},
-    {.name = "first_boot_completed",           .type = CONFIG_TYPE_BOOL,   .boolValue   = &configFirstBootCompleted},
-    {.name = "accessibility_preset",           .type = CONFIG_TYPE_UINT,   .uintValue   = &configAccessibilityPreset},
-    {.name = "reduce_camera_shake",            .type = CONFIG_TYPE_BOOL,   .boolValue   = &configReduceCameraShake},
-    {.name = "reduce_hud_flash",               .type = CONFIG_TYPE_BOOL,   .boolValue   = &configReduceHudFlash},
     // CoopNet settings
     {.name = "coopnet_ip",                     .type = CONFIG_TYPE_STRING, .stringValue = (char*)&configCoopNetIp, .maxStringLength = MAX_CONFIG_STRING},
     {.name = "coopnet_port",                   .type = CONFIG_TYPE_UINT,   .uintValue   = &configCoopNetPort},
@@ -801,9 +786,8 @@ NEXT_OPTION:
 
     if (configPlayerModel >= CT_MAX) { configPlayerModel = 0; }
 
-    if (configDjuiTheme >= MXUI_THEME_COUNT) { configDjuiTheme = 0; }
+    if (configDjuiTheme >= DJUI_THEME_MAX) { configDjuiTheme = 0; }
     if (configDjuiScale >= 5) { configDjuiScale = 0; }
-    if (configAccessibilityPreset >= 4) { configAccessibilityPreset = 1; }
 
     if (gCLIOpts.fullscreen == 1) {
         configWindow.fullscreen = true;

@@ -3,7 +3,6 @@
 #include "pc/lua/smlua.h"
 #include "smlua_anim_utils.h"
 #include "pc/debuglog.h"
-#include "game/game_init.h"
 
 // models
 #include "actors/common0.h"

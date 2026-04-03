@@ -8,6 +8,7 @@
 #ifdef LOADING_SCREEN_SUPPORTED
 
 #include "src/pc/thread.h"
+#include "djui/djui_hud_utils.h"
 
 struct LoadingSegment {
     char str[256];

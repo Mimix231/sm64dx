@@ -19,7 +19,6 @@
 #include "rumble_init.h"
 #include "pc/debuglog.h"
 #include "pc/configfile.h"
-#include "pc/mxui/mxui_exports.h"
 #include "pc/network/network.h"
 #include "pc/lua/smlua.h"
 #include "hardcoded.h"

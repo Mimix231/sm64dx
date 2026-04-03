@@ -3,7 +3,6 @@
 #include "game/camera.h"
 #include "game/level_update.h"
 #include "game/mario_misc.h"
-#include "pc/mxui/mxui_exports.h"
 #include "pc/mods/mods.h"
 
 u8 network_global_index_from_local(u8 localIndex) {
@@ -56,10 +55,8 @@ const char* network_get_player_text_color_string(u8 localIndex) {
 
 extern s16 gMenuMode;
 bool network_check_singleplayer_pause(void) {
-    bool offlineSingleplayer = network_system_is_offline() && network_player_connected_count() == 1;
     return ((gMenuMode != -1) || (gCameraMovementFlags & CAM_MOVE_PAUSE_SCREEN)) &&
-        !gDjuiInPlayerMenu && network_player_connected_count() == 1 &&
-        (offlineSingleplayer || mods_get_all_pausable());
+        !gDjuiInPlayerMenu && network_player_connected_count() == 1 && mods_get_all_pausable();
 }
 
 const char* network_discord_id_from_local_index(u8 localIndex) {

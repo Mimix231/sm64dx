@@ -12,10 +12,9 @@
 #include "engine/math_util.h"
 #include "game/object_list_processor.h"
 #include "game/mario_misc.h"
-#include "game/ingame_menu.h"
 #include "pc/configfile.h"
-#include "pc/mxui/mxui_exports.h"
-#include "pc/mxui/mxui_language.h"
+#include "pc/djui/djui.h"
+#include "pc/djui/djui_language.h"
 #include "pc/debuglog.h"
 #include "src/game/hardcoded.h"
 

@@ -2,11 +2,11 @@
 #include <errno.h>
 #include <string.h>
 #include "../network.h"
-#include "pc/mxui/mxui_exports.h"
+#include "pc/djui/djui.h"
 #include "pc/mods/mods.h"
 #include "pc/mods/mods_utils.h"
 #include "pc/utils/misc.h"
-#include "pc/mxui/mxui_exports.h"
+#include "pc/djui/djui_panel_join_message.h"
 //#define DISABLE_MODULE_LOG 1
 #include "pc/debuglog.h"
 #include "pc/fs/fmem.h"

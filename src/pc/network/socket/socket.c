@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include "pc/configfile.h"
 #include "pc/debuglog.h"
-#include "pc/mxui/mxui_exports.h"
+#include "pc/djui/djui.h"
 
 static SOCKET sCurSocket = INVALID_SOCKET;
 static struct sockaddr_in6 sAddr[MAX_PLAYERS] = { 0 };

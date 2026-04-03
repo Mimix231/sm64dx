@@ -37,7 +37,6 @@ extern struct MarioState gMarioStates[];
 enum NetworkSystemType {
     NS_SOCKET,
     NS_COOPNET,
-    NS_OFFLINE,
     NS_MAX,
 };
 
@@ -98,7 +97,6 @@ struct NametagsSettings {
 
 // Networking-specific externs
 extern struct NetworkSystem* gNetworkSystem;
-extern struct NetworkSystem gNetworkSystemOffline;
 extern enum NetworkType gNetworkType;
 extern bool gNetworkAreaLoaded;
 extern bool gNetworkAreaSyncing;
@@ -116,7 +114,6 @@ extern u32 gNetworkStartupTimer;
 
 // network.c
 void network_set_system(enum NetworkSystemType nsType);
-bool network_system_is_offline(void);
 bool network_init(enum NetworkType inNetworkType, bool reconnecting);
 void network_on_init_area(void);
 void network_on_loaded_area(void);

@@ -29,6 +29,7 @@
 #endif // End of OS-Specific GL defines
 
 #include <stdio.h>
+#include <string.h>
 #include <unistd.h>
 
 #include "gfx_window_manager_api.h"
@@ -190,18 +191,26 @@ static void gfx_sdl_onscroll(float x, float y) {
         m_scroll(x, y);
 }
 
+static bool gfx_sdl_path_is_rom(const char *path) {
+    size_t length = strlen(path);
+    if (length < 4) {
+        return false;
+    }
+    return !sys_strcasecmp(&path[length - 4], ".z64");
+}
+
 static void gfx_sdl_ondropfile(char* path) {
 #ifdef _WIN32
     char portable_path[SYS_MAX_PATH];
     if (sys_windows_short_path_from_mbs(portable_path, SYS_MAX_PATH, path)) {
-        if (!gRomIsValid) {
+        if (!gRomIsValid || gfx_sdl_path_is_rom(portable_path)) {
             rom_on_drop_file(portable_path);
         } else if (gGameInited) {
             mod_import_file(portable_path);
         }
     }
 #else
-    if (!gRomIsValid) {
+    if (!gRomIsValid || gfx_sdl_path_is_rom(path)) {
         rom_on_drop_file(path);
     } else if (gGameInited) {
         mod_import_file(path);

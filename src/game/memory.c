@@ -3,7 +3,6 @@
 
 #include "memory.h"
 #include "print.h"
-#include "game_init.h"
 #include "pc/debuglog.h"
 
 #define ALIGN16(val) (((val) + 0xF) & ~0xF)

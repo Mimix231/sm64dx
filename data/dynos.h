@@ -31,9 +31,9 @@ extern "C" {
 #endif
 
 #define DYNOS_VERSION           "1.0"
-#define DYNOS_EXE_FOLDER        sys_resource_path()
+#define DYNOS_EXE_FOLDER        sys_package_path()
 #define DYNOS_USER_FOLDER       fs_get_write_path("")
-#define DYNOS_RES_FOLDER        "dynos"
+#define DYNOS_RES_FOLDER        "moonos"
 #define DYNOS_PACKS_FOLDER      DYNOS_RES_FOLDER "/packs"
 #define DYNOS_CONFIG_FILENAME   "DynOS." DYNOS_VERSION ".config.txt"
 #define DYNOS_AT_STARTUP		__attribute__((constructor))

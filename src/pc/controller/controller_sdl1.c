@@ -26,7 +26,7 @@
 #include "game/level_update.h"
 #include "game/bettercamera.h"
 
-#include "pc/mxui/mxui.h"
+#include "pc/djui/djui.h"
 
 #define MAX_JOYBINDS 32
 #define MAX_MOUSEBUTTONS 8 // arbitrary
@@ -124,7 +124,7 @@ static void controller_sdl_init(void) {
                 joy_axis_binds[i] = -1;
     }
 
-    if (gNewCamera.isMouse && gMenuMode == -1 && !mxui_is_active()) {
+    if (gNewCamera.isMouse && gMenuMode == -1 && !gDjuiChatBoxFocus && !gDjuiConsoleFocus) {
         controller_mouse_enter_relative();
     }
     controller_mouse_read_relative();
@@ -138,7 +138,6 @@ static void controller_sdl_init(void) {
 static inline void update_button(const int i, const bool new) {
     const bool pressed = !joy_buttons[i] && new;
     joy_buttons[i] = new;
-    controller_set_key_state(VK_BASE_SDL_GAMEPAD + i, new);
     if (pressed) last_joybutton = i;
 }
 
@@ -153,7 +152,7 @@ extern s16 gMenuMode;
 static void controller_sdl_read(OSContPad *pad) {
     if (!init_ok) return;
 
-    if (gNewCamera.isMouse && gMenuMode == -1 && !mxui_is_active()) {
+    if (gNewCamera.isMouse && gMenuMode == -1 && !gDjuiChatBoxFocus && !gDjuiConsoleFocus) {
         controller_mouse_enter_relative();
     } else {
         controller_mouse_leave_relative();
@@ -162,11 +161,8 @@ static void controller_sdl_read(OSContPad *pad) {
     u32 mouse_prev = mouse_buttons;
     controller_mouse_read_relative();
     u32 mouse = mouse_buttons;
-    for (u32 i = 1; i < MAX_MOUSEBUTTONS; i++) {
-        controller_set_key_state(VK_BASE_SDL_MOUSE + i, (mouse & SDL_BUTTON(i)) != 0);
-    }
 
-    if (!mxui_is_active()) {
+    if (!gInteractableOverridePad) {
         for (u32 i = 0; i < num_mouse_binds; ++i)
             if (mouse & SDL_BUTTON(mouse_binds[i][0]))
                 pad->button |= mouse_binds[i][1];
@@ -175,14 +171,8 @@ static void controller_sdl_read(OSContPad *pad) {
     // remember buttons that changed from 0 to 1
     last_mouse = (mouse_prev ^ mouse) & mouse;
 
-    if (configDisableGamepads) {
-        controller_clear_key_states(VK_BASE_SDL_GAMEPAD, VK_OFS_SDL_MOUSE);
-        return;
-    }
-    if (!sdl_joy) {
-        controller_clear_key_states(VK_BASE_SDL_GAMEPAD, VK_OFS_SDL_MOUSE);
-        return;
-    }
+    if (configDisableGamepads) { return; }
+    if (!sdl_joy) return;
 
     SDL_JoystickUpdate();
 

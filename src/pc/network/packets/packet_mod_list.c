@@ -2,8 +2,8 @@
 #include "../network.h"
 #include "pc/mods/mods.h"
 #include "pc/mods/mods_utils.h"
-#include "pc/mxui/mxui_exports.h"
-#include "pc/mxui/mxui_exports.h"
+#include "pc/djui/djui.h"
+#include "pc/djui/djui_panel_join_message.h"
 #include "pc/debuglog.h"
 #include "pc/mods/mod_cache.h"
 

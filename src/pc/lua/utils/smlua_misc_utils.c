@@ -8,13 +8,10 @@
 #include "game/camera.h"
 #include "game/hardcoded.h"
 #include "game/hud.h"
-#include "game/game_init.h"
-#include "game/ingame_menu.h"
 #include "menu/star_select.h"
 #include "pc/lua/smlua.h"
 #include "smlua_misc_utils.h"
 #include "pc/debuglog.h"
-#include "pc/configfile.h"
 #include "pc/mods/mod.h"
 #include "pc/mods/mods.h"
 #include "pc/mods/mods_utils.h"
@@ -22,12 +19,11 @@
 #include "game/object_list_processor.h"
 #include "game/rendering_graph_node.h"
 #include "game/level_update.h"
+#include "pc/djui/djui_console.h"
+#include "pc/djui/djui_hud_utils.h"
+#include "pc/djui/djui_theme.h"
 #include "game/skybox.h"
 #include "pc/gfx/gfx_pc.h"
-#include "pc/mxui/mxui.h"
-#include "pc/mxui/mxui_theme.h"
-#include "pc/mxui/mxui_hud.h"
-#include "pc/mxui/mxui_popup.h"
 #include "include/course_table.h"
 #include "game/level_geo.h"
 #include "game/first_person_cam.h"
@@ -42,9 +38,6 @@
 #ifdef COOPNET
 #include "pc/network/coopnet/coopnet.h"
 #endif
-
-#define MXUI_FONT_NORMAL_ID 0
-#define MXUI_FONT_ALIASED_ID 3
 
 static struct DateTime sDateTime;
 
@@ -77,7 +70,8 @@ s32 deref_s32_pointer(s32* pointer) {
 ///
 
 void djui_popup_create_global(const char* message, int lines) {
-    mxui_popup_create_global(message, lines);
+    djui_popup_create(message, lines);
+    network_send_global_popup(message, lines);
 }
 
 struct AllowDjuiPopupOverride {
@@ -117,11 +111,11 @@ u8 djui_get_playerlist_page_index(void) {
 }
 
 bool djui_is_chatbox_open(void) {
-    return false;
+    return gDjuiChatBox->chatInput->base.visible;
 }
 
-s32 djui_menu_get_font(void) {
-    return configDjuiThemeFont == 0 ? MXUI_FONT_NORMAL_ID : MXUI_FONT_ALIASED_ID;
+enum DjuiFontType djui_menu_get_font(void) {
+    return configDjuiThemeFont == 0 ? FONT_NORMAL : FONT_ALIASED;
 }
 
 struct DjuiTheme* djui_menu_get_theme(void) {
@@ -129,7 +123,7 @@ struct DjuiTheme* djui_menu_get_theme(void) {
 }
 
 bool djui_is_playerlist_ping_visible(void) {
-    return configShowPing;
+    return false;
 }
 
 ///
@@ -263,26 +257,26 @@ static struct TextureInfo sPowerMeterTexturesInfo[] = {
 };
 
 void hud_render_power_meter(s32 health, f32 x, f32 y, f32 width, f32 height) {
-    mxui_hud_render_texture(&sPowerMeterTexturesInfo[0], x, y, width / 64, height / 64);
-    mxui_hud_render_texture(&sPowerMeterTexturesInfo[1], x + (width - 2) / 2, y, width / 64, height / 64);
+    djui_hud_render_texture(&sPowerMeterTexturesInfo[0], x, y, width / 64, height / 64);
+    djui_hud_render_texture(&sPowerMeterTexturesInfo[1], x + (width - 2) / 2, y, width / 64, height / 64);
     s32 numWedges = MIN(MAX(health >> 8, 0), 8);
     if (numWedges != 0) {
-        mxui_hud_render_texture(&sPowerMeterTexturesInfo[numWedges + 1], x + (width - 4) / 4, y + height / 4, width / 64,  height / 64);
+        djui_hud_render_texture(&sPowerMeterTexturesInfo[numWedges + 1], x + (width - 4) / 4, y + height / 4, width / 64,  height / 64);
     }
 }
 
 void hud_render_power_meter_interpolated(s32 health, f32 prevX, f32 prevY, f32 prevWidth, f32 prevHeight, f32 x, f32 y, f32 width, f32 height) {
-    mxui_hud_render_texture_interpolated(&sPowerMeterTexturesInfo[0],
+    djui_hud_render_texture_interpolated(&sPowerMeterTexturesInfo[0],
         prevX, prevY, prevWidth / 64, prevHeight / 64,
         x,     y,     width     / 64, height     / 64);
 
-    mxui_hud_render_texture_interpolated(&sPowerMeterTexturesInfo[1],
+    djui_hud_render_texture_interpolated(&sPowerMeterTexturesInfo[1],
         prevX + (prevWidth - 2) / 2, prevY, prevWidth / 64, prevHeight / 64,
         x     + (width - 2)     / 2, y,     width     / 64, height     / 64);
 
     s32 numWedges = MIN(MAX(health >> 8, 0), 8);
     if (numWedges != 0) {
-        mxui_hud_render_texture_interpolated(&sPowerMeterTexturesInfo[numWedges + 1],
+        djui_hud_render_texture_interpolated(&sPowerMeterTexturesInfo[numWedges + 1],
             prevX + (prevWidth - 4) / 4, prevY + prevHeight / 4, prevWidth / 64, prevHeight / 64,
             x     + (width - 4)     / 4, y     + height     / 4, width     / 64, height     / 64);
     }
@@ -293,13 +287,13 @@ s8 hud_get_flash(void) {
 }
 
 void hud_set_flash(s8 value) {
-    gHudFlash = (configReduceHudFlash && value != 0) ? -1 : value;
+    gHudFlash = value;
 }
 
 ///
 
 bool is_game_paused(void) {
-    return gMenuMode != -1 || mxui_is_pause_active();
+    return gMenuMode != -1;
 }
 
 bool is_pause_menu_hidden(void) {
@@ -311,10 +305,6 @@ void set_pause_menu_hidden(bool hidden) {
 }
 
 void game_pause(void) {
-    if (mxui_try_open_pause_menu()) {
-        return;
-    }
-
     if (gMenuMode != -1) { return; }
 
     lower_background_noise(1);
@@ -324,11 +314,6 @@ void game_pause(void) {
 }
 
 void game_unpause(void) {
-    if (mxui_is_pause_active()) {
-        mxui_close_pause_menu_with_mode(1);
-        return;
-    }
-
     if (gMenuMode == -1) { return; }
 
     level_set_transition(0, NULL);

@@ -9,7 +9,7 @@ extern "C" {
 #include "engine/behavior_script.h"
 #include "engine/math_util.h"
 #include "game/moving_texture.h"
-#include "pc/mxui/mxui_console.h"
+#include "pc/djui/djui_console.h"
 #include "pc/fs/fmem.h"
 }
 
@@ -742,10 +742,10 @@ void Print(const char *aFmt, Args... aArgs) {
 }
 
 template <typename... Args>
-void PrintConsole(int level, const char *aFmt, Args... aArgs) {
-    snprintf(gMxuiConsoleTmpBuffer, MXUI_CONSOLE_MAX_TMP_BUFFER, aFmt, aArgs...);
-    sys_swap_backslashes(gMxuiConsoleTmpBuffer);
-    mxui_console_message_create(gMxuiConsoleTmpBuffer, level);
+void PrintConsole(enum ConsoleMessageLevel level, const char *aFmt, Args... aArgs) {
+    snprintf(gDjuiConsoleTmpBuffer, CONSOLE_MAX_TMP_BUFFER, aFmt, aArgs...);
+    sys_swap_backslashes(gDjuiConsoleTmpBuffer);
+    djui_console_message_create(gDjuiConsoleTmpBuffer, level);
 }
 
 template <typename... Args>
@@ -753,12 +753,12 @@ void PrintError(const char *aFmt, Args... aArgs) {
     printf(aFmt, aArgs...);
     printf("\r\n");
     fflush(stdout);
-    PrintConsole(MXUI_CONSOLE_MESSAGE_ERROR, aFmt, aArgs...);
+    PrintConsole(CONSOLE_MESSAGE_ERROR, aFmt, aArgs...);
 }
 #define PrintDataError(...) { \
     if (aGfxData->mErrorCount == 0) Print("  ERROR!"); \
     Print(__VA_ARGS__); \
-    PrintConsole(MXUI_CONSOLE_MESSAGE_ERROR, __VA_ARGS__); \
+    PrintConsole(CONSOLE_MESSAGE_ERROR, __VA_ARGS__); \
     aGfxData->mErrorCount++; \
 }
 

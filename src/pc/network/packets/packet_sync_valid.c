@@ -11,7 +11,7 @@ void network_send_sync_valid(struct NetworkPlayer* toNp, s16 courseNum, s16 actN
     toNp->currLevelSyncValid = true;
     toNp->currAreaSyncValid  = true;
 
-    if (gNetworkType == NT_SERVER && toNp == gNetworkPlayerLocal) {
+    if ((gNetworkType == NT_SERVER && toNp == gNetworkPlayerLocal) || gNetworkType == NT_NONE) {
         // the player is the server, no need to send sync valid
         gNetworkAreaSyncing = false;
 

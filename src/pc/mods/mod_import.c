@@ -4,8 +4,8 @@
 #include "pc/utils/miniz/miniz.h"
 #include "pc/debuglog.h"
 #include "data/dynos.c.h"
-#include "pc/mxui/mxui_language.h"
-#include "pc/mxui/mxui_popup.h"
+#include "pc/djui/djui_language.h"
+#include "pc/djui/djui_popup.h"
 #include "mods.h"
 #include "mods_utils.h"
 
@@ -259,7 +259,7 @@ bool mod_import_file(char* path) {
     bool ret = false;
 
     if (gNetworkType != NT_NONE && !path_ends_with(path, ".ini")) {
-        mxui_popup_create(DLANG(NOTIF, IMPORT_FAIL_INGAME), 2);
+        djui_popup_create(DLANG(NOTIF, IMPORT_FAIL_INGAME), 2);
         return false;
     }
 
@@ -279,19 +279,19 @@ bool mod_import_file(char* path) {
     if (ret) {
         if (isLua) {
             mods_refresh_local();
-            mxui_language_replace(DLANG(NOTIF, IMPORT_MOD_SUCCESS), msg, SYS_MAX_PATH, '@', basename);
-            mxui_popup_create(msg, 2);
+            djui_language_replace(DLANG(NOTIF, IMPORT_MOD_SUCCESS), msg, SYS_MAX_PATH, '@', basename);
+            djui_popup_create(msg, 2);
         } else if (isDynos) {
             dynos_gfx_init();
-            mxui_language_replace(DLANG(NOTIF, IMPORT_DYNOS_SUCCESS), msg, SYS_MAX_PATH, '@', basename);
-            mxui_popup_create(msg, 2);
+            djui_language_replace(DLANG(NOTIF, IMPORT_DYNOS_SUCCESS), msg, SYS_MAX_PATH, '@', basename);
+            djui_popup_create(msg, 2);
         } else if (isPalette) {
-            mxui_language_replace(DLANG(NOTIF, IMPORT_PALETTE_SUCCESS), msg, SYS_MAX_PATH, '@', basename);
-            mxui_popup_create(msg, 2);
+            djui_language_replace(DLANG(NOTIF, IMPORT_PALETTE_SUCCESS), msg, SYS_MAX_PATH, '@', basename);
+            djui_popup_create(msg, 2);
         }
     } else {
-        mxui_language_replace(DLANG(NOTIF, IMPORT_FAIL), msg, SYS_MAX_PATH, '@', basename);
-        mxui_popup_create(msg, 2);
+        djui_language_replace(DLANG(NOTIF, IMPORT_FAIL), msg, SYS_MAX_PATH, '@', basename);
+        djui_popup_create(msg, 2);
     }
 
     return ret;

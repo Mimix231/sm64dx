@@ -1,14 +1,11 @@
 #include "lib/src/libultra_internal.h"
 #include "lib/src/osContInternal.h"
 #include "macros.h"
-#include <string.h>
 
 #include "../configfile.h"
 
 #include "controller_keyboard.h"
 #include "controller_sdl.h"
-
-#define CONTROLLER_VK_TOTAL (VK_SIZE * 2)
 
 // Analog camera movement by Pathétique (github.com/vrmiguel), y0shin and Mors
 // Contribute or communicate bugs at github.com/vrmiguel/sm64-analog-camera
@@ -21,9 +18,6 @@ static struct ControllerAPI *controller_implementations[] = {
 #endif
     &controller_keyboard,
 };
-
-static bool sControllerKeysDown[CONTROLLER_VK_TOTAL] = { false };
-static bool sControllerPrevKeysDown[CONTROLLER_VK_TOTAL] = { false };
 
 s32 osContInit(UNUSED OSMesgQueue *mq, u8 *controllerBits, UNUSED OSContStatus *status) {
     for (size_t i = 0; i < sizeof(controller_implementations) / sizeof(struct ControllerAPI *); i++)
@@ -73,62 +67,6 @@ u32 controller_get_raw_key(void) {
         if (vk != VK_INVALID) return vk + controller_implementations[i]->vkbase;
     }
     return VK_INVALID;
-}
-
-bool controller_key_down(u32 vk) {
-    return (vk < CONTROLLER_VK_TOTAL) ? sControllerKeysDown[vk] : false;
-}
-
-bool controller_key_pressed(u32 vk) {
-    return (vk < CONTROLLER_VK_TOTAL) ? (sControllerKeysDown[vk] && !sControllerPrevKeysDown[vk]) : false;
-}
-
-bool controller_key_released(u32 vk) {
-    return (vk < CONTROLLER_VK_TOTAL) ? (!sControllerKeysDown[vk] && sControllerPrevKeysDown[vk]) : false;
-}
-
-static bool controller_bind_matches(bool (*match)(u32), const unsigned int bindValue[MAX_BINDS]) {
-    if (bindValue == NULL || match == NULL) { return false; }
-
-    for (u32 i = 0; i < MAX_BINDS; i++) {
-        if (bindValue[i] == VK_INVALID) { continue; }
-        if (match(bindValue[i])) {
-            return true;
-        }
-    }
-    return false;
-}
-
-bool controller_bind_down(const unsigned int bindValue[MAX_BINDS]) {
-    return controller_bind_matches(controller_key_down, bindValue);
-}
-
-bool controller_bind_pressed(const unsigned int bindValue[MAX_BINDS]) {
-    return controller_bind_matches(controller_key_pressed, bindValue);
-}
-
-bool controller_bind_released(const unsigned int bindValue[MAX_BINDS]) {
-    return controller_bind_matches(controller_key_released, bindValue);
-}
-
-void controller_set_key_state(u32 vk, bool down) {
-    if (vk >= CONTROLLER_VK_TOTAL) { return; }
-    sControllerKeysDown[vk] = down;
-}
-
-void controller_clear_key_states(u32 vkBase, u32 count) {
-    if (vkBase >= CONTROLLER_VK_TOTAL) { return; }
-    if (vkBase + count > CONTROLLER_VK_TOTAL) {
-        count = CONTROLLER_VK_TOTAL - vkBase;
-    }
-
-    for (u32 i = 0; i < count; i++) {
-        sControllerKeysDown[vkBase + i] = false;
-    }
-}
-
-void controller_finalize_frame(void) {
-    memcpy(sControllerPrevKeysDown, sControllerKeysDown, sizeof(sControllerKeysDown));
 }
 
 void controller_shutdown(void) {

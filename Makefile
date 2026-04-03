@@ -484,22 +484,23 @@ _ := $(shell $(PYTHON) $(TOOLS_DIR)/copy_extended_sounds.py)
 # Target Executable and Sources                                                #
 #==============================================================================#
 
-BUILD_DIR_BASE := build
-# BUILD_DIR is the location where all build artifacts are placed
+BUILD_DIR_BASE := build/intermediate
+DIST_DIR := build/$(VERSION)_pc
+# BUILD_DIR is the location where intermediate build artifacts are placed
 BUILD_DIR := $(BUILD_DIR_BASE)/$(VERSION)_pc
 
 ifeq ($(WINDOWS_BUILD),1)
-	EXE := $(BUILD_DIR)/sm64dx.exe
+	EXE := $(DIST_DIR)/sm64dx.exe
 else # Linux builds/binary namer
 	ifeq ($(TARGET_RPI),1)
-		EXE := $(BUILD_DIR)/sm64dx.arm
+		EXE := $(DIST_DIR)/sm64dx.arm
 	else
-		EXE := $(BUILD_DIR)/sm64dx
+		EXE := $(DIST_DIR)/sm64dx
 	endif
 endif
 
 ifeq ($(TARGET_RK3588),1)
-  EXE := $(BUILD_DIR)/sm64dx.arm
+  EXE := $(DIST_DIR)/sm64dx.arm
 endif
 
 ELF            := $(BUILD_DIR)/$(TARGET).elf
@@ -516,7 +517,7 @@ SRC_DIRS := src src/engine src/game src/audio src/menu src/buffers actors levels
 BIN_DIRS := bin bin/$(VERSION)
 
 # PC files
-SRC_DIRS += src/pc src/pc/gfx src/pc/audio src/pc/controller src/pc/fs src/pc/fs/packtypes src/pc/mods src/pc/dev src/pc/network src/pc/network/packets src/pc/network/socket src/pc/network/coopnet src/pc/utils src/pc/utils/miniz src/pc/mxui src/pc/lua src/pc/lua/utils src/pc/os
+SRC_DIRS += src/pc src/pc/gfx src/pc/audio src/pc/controller src/pc/fs src/pc/fs/packtypes src/pc/mods src/pc/dev src/pc/network src/pc/network/packets src/pc/network/socket src/pc/network/coopnet src/pc/utils src/pc/utils/miniz src/pc/djui src/pc/lua src/pc/lua/utils src/pc/os
 
 ifeq ($(DISCORD_SDK),1)
   SRC_DIRS += src/pc/discord
@@ -617,20 +618,20 @@ ifeq ($(DISCORD_SDK), 1)
   endif
 endif
 
-LANG_DIR := lang
-
-# Remove old lang dir
-_ := $(shell rm -rf ./$(BUILD_DIR)/$(LANG_DIR))
-
 MOD_DIR := mods
 
 # Remove old mod dir
 _ := $(shell $(PYTHON) $(TOOLS_DIR)/remove_built_in_mods.py)
 
 PALETTES_DIR := palettes
+MOONOS_SOURCE_DIR := moonos
+MOONOS_RUNTIME_DIR := moonos
+MOONOS_RUNTIME_PACKS_DIR := $(MOONOS_RUNTIME_DIR)/packs
+DYNOS_SOURCE_DIR := dynos
 
-# Remove old palettes dir
-_ := $(shell rm -rf ./$(BUILD_DIR)/$(PALETTES_DIR))
+RESOURCES_DIR := resources
+RESOURCES_SUBDIRS := actors assets autogen bin data developer docs include lang levels lib res sound src text textures tools
+RUNTIME_LIBS_STAMP := $(DIST_DIR)/.runtime-libs
 
 # Automatic dependency files
 DEP_FILES := $(O_FILES:.o=.d) $(ULTRA_O_FILES:.o=.d) $(GODDARD_O_FILES:.o=.d) $(BUILD_DIR)/$(LD_SCRIPT).d
@@ -1176,10 +1177,13 @@ endef
 #==============================================================================#
 
 #all: $(ROM)
-all: $(EXE)
+all: $(EXE) $(RUNTIME_LIBS_STAMP) $(DIST_DIR)/$(MOD_DIR) $(DIST_DIR)/$(MOONOS_RUNTIME_DIR) $(DIST_DIR)/$(PALETTES_DIR) $(DIST_DIR)/$(RESOURCES_DIR)
+
+FORCE:
+.PHONY: FORCE
 
 ifeq ($(WINDOWS_BUILD),1)
-MAPFILE = $(BUILD_DIR)/coop.map
+MAPFILE = $(DIST_DIR)/sm64dx.map
 exemap: $(EXE)
 	@$(PRINT) "$(GREEN)Creating map file: $(BLUE)$(MAPFILE) $(NO_COL)\n"
 	$(V)$(OBJDUMP) -t $(EXE) > $(MAPFILE)
@@ -1192,7 +1196,7 @@ all: exemap
 endif
 
 clean:
-	$(RM) -r $(BUILD_DIR_BASE)
+	$(RM) -r build
 
 cleantools:
 	$(MAKE) -s -C $(TOOLS_DIR) clean
@@ -1208,23 +1212,40 @@ load: $(ROM)
 
 libultra: $(BUILD_DIR)/libultra.a
 
-$(BUILD_DIR)/$(RPC_LIBS):
-	@$(CP) -f $(RPC_LIBS) $(BUILD_DIR)
+$(RUNTIME_LIBS_STAMP):
+	@mkdir -p $(DIST_DIR)
+	@if [ -n "$(strip $(RPC_LIBS))" ]; then $(CP) -f $(RPC_LIBS) $(DIST_DIR); fi
+	@if [ -n "$(strip $(DISCORD_SDK_LIBS))" ]; then $(CP) -f $(DISCORD_SDK_LIBS) $(DIST_DIR); fi
+	@if [ -n "$(strip $(COOPNET_LIBS))" ]; then $(CP) -f $(COOPNET_LIBS) $(DIST_DIR); fi
+	@touch $@
 
-$(BUILD_DIR)/$(DISCORD_SDK_LIBS):
-	@$(CP) -f $(DISCORD_SDK_LIBS) $(BUILD_DIR)
+$(DIST_DIR)/$(MOD_DIR): FORCE
+	@mkdir -p $(DIST_DIR)
+	@rm -rf $(DIST_DIR)/$(MOD_DIR)
+	$(CP) -f -r $(MOD_DIR) $(DIST_DIR)
 
-$(BUILD_DIR)/$(COOPNET_LIBS):
-	@$(CP) -f $(COOPNET_LIBS) $(BUILD_DIR)
+$(DIST_DIR)/$(MOONOS_RUNTIME_DIR): FORCE
+	@mkdir -p $(DIST_DIR)
+	@rm -rf $(DIST_DIR)/$(MOONOS_RUNTIME_DIR)
+	@mkdir -p $(DIST_DIR)/$(MOONOS_RUNTIME_PACKS_DIR)
+	@if [ -d "$(DYNOS_SOURCE_DIR)/packs" ]; then \
+		$(CP) -f -r $(DYNOS_SOURCE_DIR)/packs/. $(DIST_DIR)/$(MOONOS_RUNTIME_PACKS_DIR); \
+	fi
+	@if [ -d "$(MOONOS_SOURCE_DIR)" ]; then \
+		$(CP) -f -r $(MOONOS_SOURCE_DIR)/. $(DIST_DIR)/$(MOONOS_RUNTIME_PACKS_DIR); \
+	fi
 
-$(BUILD_DIR)/$(LANG_DIR):
-	@$(CP) -f -r $(LANG_DIR) $(BUILD_DIR)
+$(DIST_DIR)/$(PALETTES_DIR): FORCE
+	@mkdir -p $(DIST_DIR)
+	@rm -rf $(DIST_DIR)/$(PALETTES_DIR)
+	@$(CP) -f -r $(PALETTES_DIR) $(DIST_DIR)
 
-$(BUILD_DIR)/$(MOD_DIR):
-	$(CP) -f -r $(MOD_DIR) $(BUILD_DIR)
-
-$(BUILD_DIR)/$(PALETTES_DIR):
-	@$(CP) -f -r $(PALETTES_DIR) $(BUILD_DIR)
+$(DIST_DIR)/$(RESOURCES_DIR): FORCE
+	@rm -rf $(DIST_DIR)/$(RESOURCES_DIR)
+	@mkdir -p $(DIST_DIR)/$(RESOURCES_DIR)
+	@for dir in $(RESOURCES_SUBDIRS); do \
+		$(CP) -f -r $$dir $(DIST_DIR)/$(RESOURCES_DIR); \
+	done
 
 # Extra object file dependencies
 
@@ -1275,7 +1296,7 @@ else
   endif
 endif
 
-ALL_DIRS := $(BUILD_DIR) $(addprefix $(BUILD_DIR)/,$(SRC_DIRS) $(GODDARD_SRC_DIRS) $(ULTRA_SRC_DIRS) $(ULTRA_BIN_DIRS) $(BIN_DIRS) $(TEXTURE_DIRS) $(TEXT_DIRS) $(SOUND_SAMPLE_DIRS) $(addprefix levels/,$(LEVEL_DIRS)) rsp include) $(MIO0_DIR) $(addprefix $(MIO0_DIR)/,$(VERSION)) $(SOUND_BIN_DIR) $(SOUND_BIN_DIR)/sequences/$(VERSION)
+ALL_DIRS := $(DIST_DIR) $(BUILD_DIR) $(addprefix $(BUILD_DIR)/,$(SRC_DIRS) $(GODDARD_SRC_DIRS) $(ULTRA_SRC_DIRS) $(ULTRA_BIN_DIRS) $(BIN_DIRS) $(TEXTURE_DIRS) $(TEXT_DIRS) $(SOUND_SAMPLE_DIRS) $(addprefix levels/,$(LEVEL_DIRS)) rsp include) $(MIO0_DIR) $(addprefix $(MIO0_DIR)/,$(VERSION)) $(SOUND_BIN_DIR) $(SOUND_BIN_DIR)/sequences/$(VERSION)
 
 # Make sure build directory exists before compiling anything
 DUMMY != mkdir -p $(ALL_DIRS)
@@ -1565,7 +1586,7 @@ ifeq ($(TARGET_N64),1)
   $(BUILD_DIR)/$(TARGET).objdump: $(ELF)
 	$(OBJDUMP) -D $< > $@
 else
-  $(EXE): $(O_FILES) $(MIO0_FILES:.mio0=.o) $(ULTRA_O_FILES) $(GODDARD_O_FILES) $(BUILD_DIR)/$(RPC_LIBS) $(BUILD_DIR)/$(DISCORD_SDK_LIBS) $(BUILD_DIR)/$(COOPNET_LIBS) $(BUILD_DIR)/$(LANG_DIR) $(BUILD_DIR)/$(MOD_DIR) $(BUILD_DIR)/$(PALETTES_DIR)
+  $(EXE): $(O_FILES) $(MIO0_FILES:.mio0=.o) $(ULTRA_O_FILES) $(GODDARD_O_FILES) $(RUNTIME_LIBS_STAMP) $(DIST_DIR)/$(MOD_DIR) $(DIST_DIR)/$(MOONOS_RUNTIME_DIR) $(DIST_DIR)/$(PALETTES_DIR) $(DIST_DIR)/$(RESOURCES_DIR)
 	@$(PRINT) "$(GREEN)Linking executable: $(BLUE)$@ $(NO_COL)\n"
 	$(V)$(LD) $(PROF_FLAGS) -L $(BUILD_DIR) -o $@ $(O_FILES) $(ULTRA_O_FILES) $(GODDARD_O_FILES) $(LDFLAGS)
 endif
@@ -1588,22 +1609,22 @@ endif
 
 all:
 	@if [ "$(USE_APP)" = "0" ]; then \
-		rm -rf build/us_pc/sm64dx.app; \
+		rm -rf $(DIST_DIR)/sm64dx.app; \
   else \
-		$(PRINT) "$(GREEN)Creating App Bundle: $(BLUE)build/us_pc/sm64dx.app\n"; \
+		$(PRINT) "$(GREEN)Creating App Bundle: $(BLUE)$(DIST_DIR)/sm64dx.app\n"; \
 		rm -rf $(APP_DIR); \
-		rm -rf build/us_pc/sm64dx.app; \
+		rm -rf $(DIST_DIR)/sm64dx.app; \
 		mkdir -p $(APP_MACOS_DIR); \
 		mkdir -p $(APP_RESOURCES_DIR); \
-		mv build/us_pc/sm64dx $(APP_MACOS_DIR)/sm64dx; \
-    cp -r build/us_pc/mods $(APP_RESOURCES_DIR); \
-    cp -r build/us_pc/lang $(APP_RESOURCES_DIR); \
-    cp -r build/us_pc/dynos $(APP_RESOURCES_DIR); \
-    cp -r build/us_pc/palettes $(APP_RESOURCES_DIR); \
-		cp build/us_pc/discord_game_sdk.dylib $(APP_MACOS_DIR); \
-    cp build/us_pc/libdiscord_game_sdk.dylib $(APP_MACOS_DIR); \
-    cp build/us_pc/libcoopnet.dylib $(APP_MACOS_DIR); \
-    cp build/us_pc/libjuice.1.6.2.dylib $(APP_MACOS_DIR); \
+		mv $(DIST_DIR)/sm64dx $(APP_MACOS_DIR)/sm64dx; \
+    cp -r $(DIST_DIR)/mods $(APP_RESOURCES_DIR); \
+    cp -r $(DIST_DIR)/moonos $(APP_RESOURCES_DIR); \
+    cp -r $(DIST_DIR)/palettes $(APP_RESOURCES_DIR); \
+    cp -r $(DIST_DIR)/resources $(APP_RESOURCES_DIR); \
+		cp $(DIST_DIR)/discord_game_sdk.dylib $(APP_MACOS_DIR); \
+    cp $(DIST_DIR)/libdiscord_game_sdk.dylib $(APP_MACOS_DIR); \
+    cp $(DIST_DIR)/libcoopnet.dylib $(APP_MACOS_DIR); \
+    cp $(DIST_DIR)/libjuice.1.6.2.dylib $(APP_MACOS_DIR); \
     cp $(SDL2_LIB) $(APP_MACOS_DIR)/libSDL2.dylib; \
     install_name_tool -change $(BREW_PREFIX)/opt/sdl2/lib/libSDL2-2.0.0.dylib @executable_path/libSDL2.dylib $(APP_MACOS_DIR)/sm64dx; > /dev/null 2>&1 \
 		install_name_tool -id @executable_path/libSDL2.dylib $(APP_MACOS_DIR)/libSDL2.dylib; > /dev/null 2>&1 \
@@ -1630,7 +1651,7 @@ all:
 		echo '</dict>' >> $(APP_CONTENTS_DIR)/Info.plist; \
 		echo '</plist>' >> $(APP_CONTENTS_DIR)/Info.plist; \
 		chmod +x $(APP_MACOS_DIR)/sm64dx; \
-		mv $(APP_DIR) build/us_pc/; \
+		mv $(APP_DIR) $(DIST_DIR)/; \
   fi
 
 # Remove built-in rules, to improve performance

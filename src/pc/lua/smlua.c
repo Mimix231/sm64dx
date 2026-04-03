@@ -12,7 +12,7 @@
 #include "pc/lua/utils/smlua_model_utils.h"
 #include "pc/lua/utils/smlua_level_utils.h"
 #include "pc/lua/utils/smlua_anim_utils.h"
-#include "pc/mxui/mxui_exports.h"
+#include "pc/djui/djui.h"
 #include "pc/fs/fmem.h"
 
 lua_State* gLuaState = NULL;

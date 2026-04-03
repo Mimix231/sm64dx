@@ -5,8 +5,6 @@
 #include "game/camera.h"
 #include "pc/lua/smlua_utils.h"
 
-struct DjuiTheme;
-
 enum HudDisplayValue {
     HUD_DISPLAY_LIVES,
     HUD_DISPLAY_COINS,
@@ -64,8 +62,6 @@ s32* get_temp_s32_pointer(s32 initialValue);
 /* |description|Gets the signed 32-bit integer value from `pointer`|descriptionEnd| */
 s32 deref_s32_pointer(s32* pointer);
 
-/* |description|Creates an MXUI popup that is broadcasted to every client|descriptionEnd| */
-void mxui_popup_create_global(const char* message, int lines);
 /* |description|Creates a DJUI popup that is broadcasted to every client|descriptionEnd| */
 void djui_popup_create_global(const char* message, int lines);
 /* |description|Returns if popups are disabled|descriptionEnd| */
@@ -83,7 +79,7 @@ u8 djui_get_playerlist_page_index(void);
 /* |description|Checks if the DJUI chatbox is open|descriptionEnd| */
 bool djui_is_chatbox_open(void);
 /* |description|Gets the DJUI menu font|descriptionEnd| */
-s32 djui_menu_get_font(void);
+enum DjuiFontType djui_menu_get_font(void);
 /* |description|Gets the DJUI menu theme|descriptionEnd| */
 struct DjuiTheme* djui_menu_get_theme(void);
 /* |description|Checks if the DJUI playerlist ping icon is visible|descriptionEnd| */

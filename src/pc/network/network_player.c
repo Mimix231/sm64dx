@@ -1,12 +1,9 @@
-#include "sm64.h"
 #include "network_player.h"
 #include "types.h"
 #include "object_fields.h"
 #include "game/mario_misc.h"
+#include "pc/djui/djui.h"
 #include "pc/debuglog.h"
-#include "pc/mxui/mxui_language.h"
-#include "pc/mxui/mxui_popup.h"
-#include "pc/mxui/mxui_unicode.h"
 #include "pc/utils/misc.h"
 #include "game/area.h"
 #include "game/level_info.h"
@@ -14,12 +11,12 @@
 #include "game/object_helpers.h"
 #include "pc/lua/smlua_hooks.h"
 #include "pc/network/socket/socket.h"
-#include "pc/lua/utils/smlua_model_utils.h"
 #include "lag_compensation.h"
 #ifdef DISCORD_SDK
 #include "pc/discord/discord.h"
 #endif
 #include "game/mario.h"
+#include "pc/djui/djui_unicode.h"
 
 struct NetworkPlayer gNetworkPlayers[MAX_PLAYERS] = { 0 };
 struct NetworkPlayer *gNetworkPlayerLocal = NULL;
@@ -35,10 +32,10 @@ bool network_player_name_valid(char* buffer) {
     char* c = buffer;
     while (*c != '\0') {
         if (*c == ' ') { return false; }
-        if (!mxui_unicode_valid_char(c)) { return false; }
+        if (!djui_unicode_valid_char(c)) { return false; }
         if (*c == '\\') { numEscapeChars++; isInEscapedChar = !isInEscapedChar; }
         else if (!isInEscapedChar) { isOnlyEscapeChars = false; }
-        c = mxui_unicode_next_char(c);
+        c = djui_unicode_next_char(c);
     }
     if (isOnlyEscapeChars) { return false; }
     if (numEscapeChars % 2 != 0) { return false; }
@@ -63,18 +60,6 @@ void network_player_update_model(u8 localIndex) {
     m->character = &gCharacters[index];
 
     if (m->marioObj == NULL || m->marioObj->behavior != bhvMario) { return; }
-
-    if (localIndex == 0 && configPlayerMoonosGeo[0] != '\0') {
-        enum ModelExtendedId extId = smlua_model_util_get_id(configPlayerMoonosGeo);
-        if (extId != E_MODEL_ERROR_MODEL) {
-            u16 loadedId = smlua_model_util_load(extId);
-            if (loadedId != MODEL_ERROR_MODEL && loadedId != MODEL_NONE) {
-                obj_set_model(m->marioObj, loadedId);
-                return;
-            }
-        }
-    }
-
     obj_set_model(m->marioObj, m->character->modelId);
 }
 
@@ -448,11 +433,11 @@ void construct_player_popup(struct NetworkPlayer* np, char* msg, const char* lev
     char player[128] = { 0 };
     snprintf(player, 128, "%s%s\\#dcdcdc\\", network_get_player_text_color_string(np->localIndex), np->name);
     if (level) {
-        mxui_language_replace2(msg, &built[9], 256 - 9, '@', player, '#', (char*)level);
+        djui_language_replace2(msg, &built[9], 256 - 9, '@', player, '#', (char*)level);
     } else {
-        mxui_language_replace(msg, &built[9], 256 - 9, '@', player);
+        djui_language_replace(msg, &built[9], 256 - 9, '@', player);
     }
-    mxui_popup_create(built, 1);
+    djui_popup_create(built, 1);
 }
 
 void network_player_update_course_level(struct NetworkPlayer* np, s16 courseNum, s16 actNum, s16 levelNum, s16 areaIndex) {
@@ -528,6 +513,6 @@ void network_player_shutdown(bool popup) {
         gNetworkSystem->clear_id(i);
     }
 
-    if (popup) { mxui_popup_create(DLANG(NOTIF, SERVER_CLOSED), 1); }
+    if (popup) { djui_popup_create(DLANG(NOTIF, SERVER_CLOSED), 1); }
     LOG_INFO("cleared all network players");
 }

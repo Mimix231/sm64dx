@@ -13,8 +13,8 @@
 #include "engine/math_util.h"
 
 #include "pc/controller/controller_mouse.h"
-#include "pc/mxui/mxui_exports.h"
-#include "pc/mxui/mxui_exports.h"
+#include "pc/djui/djui.h"
+#include "pc/djui/djui_hud_utils.h"
 #include "pc/lua/utils/smlua_camera_utils.h"
 #include "pc/lua/smlua_hooks.h"
 

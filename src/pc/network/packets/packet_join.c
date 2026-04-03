@@ -12,12 +12,11 @@
 #include "pc/fs/fs.h"
 #include "PR/os_eeprom.h"
 #include "pc/network/version.h"
-#include "pc/mxui/mxui_exports.h"
-#include "pc/mxui/mxui_exports.h"
-#include "pc/mxui/mxui_exports.h"
-#include "pc/mxui/mxui_exports.h"
-#include "pc/mxui/mxui_exports.h"
-#include "pc/mxui/mxui_exports.h"
+#include "pc/djui/djui.h"
+#include "pc/djui/djui_panel.h"
+#include "pc/djui/djui_panel_modlist.h"
+#include "pc/djui/djui_panel_menu.h"
+#include "pc/djui/djui_panel_join_message.h"
 #include "pc/utils/string_builder.h"
 //#define DISABLE_MODULE_LOG 1
 #include "pc/debuglog.h"
@@ -183,6 +182,7 @@ void network_receive_join(struct Packet* p) {
 
     network_player_connected(NPT_SERVER, 0, 0, &DEFAULT_MARIO_PALETTE, "Player", "0");
     network_player_connected(NPT_LOCAL, myGlobalIndex, configPlayerModel, &configPlayerPalette, configPlayerName, get_local_discord_id());
+    djui_chat_box_create();
 
     save_file_load_all(TRUE);
 

@@ -34,7 +34,7 @@ void network_send_change_area(void) {
         }
     }
 
-    if (gNetworkType == NT_SERVER) {
+    if (gNetworkType != NT_CLIENT) {
         player_changed_area(gNetworkPlayerLocal, gCurrCourseNum, gCurrActStarNum, gCurrLevelNum, gCurrAreaIndex);
         return;
     }

@@ -140,13 +140,6 @@
 #define gDPSetTextureClippingDjui(pkt, x1, y1, x2, y2)          gSetClippingDjui(pkt, G_TEXCLIP_DJUI, x1, y1, x2, y2)
 #define gDPSetTextureOverrideDjui(pkt, texture, w, h, fmt, siz) gSetOverrideDjui(pkt, G_TEXOVERRIDE_DJUI, texture, w, h, fmt, siz)
 
-#define gSP2TrianglesMxui(pkt, v00, v01, v02, flag0, v10, v11, v12, flag1) \
-    gSP2TrianglesDjui(pkt, v00, v01, v02, flag0, v10, v11, v12, flag1)
-#define gsSPExecuteMxui(word)                                   gsSPExecuteDjui(word)
-#define gDPSetTextureClippingMxui(pkt, x1, y1, x2, y2)          gSetClippingDjui(pkt, G_TEXCLIP_DJUI, x1, y1, x2, y2)
-#define gDPSetTextureOverrideMxui(pkt, texture, w, h, fmt, siz) gSetOverrideDjui(pkt, G_TEXOVERRIDE_DJUI, texture, w, h, fmt, siz)
-#define gsSPTextureAddrMxui(word)                               gsSPTextureAddrDjui(word)
-
 /////////////////
 // G_SETENVRGB //
 /////////////////

@@ -21,11 +21,8 @@ char gLastRemoteBhv[256] = "";
 #include "game/segment2.h"
 #include "game/mario.h"
 #include "gfx_dimensions.h"
-#include "pc/mxui/mxui_exports.h"
-#include "pc/mxui/mxui_font.h"
-#include "pc/mxui/mxui_render.h"
-#include "pc/mxui/mxui_runtime.h"
-#include "pc/mxui/mxui_unicode.h"
+#include "pc/djui/djui.h"
+#include "pc/djui/djui_unicode.h"
 #include "pc/network/network.h"
 #include "pc/gfx/gfx_rendering_api.h"
 #include "pc/mods/mods.h"
@@ -216,7 +213,7 @@ static void crash_handler_produce_one_frame_callback(void) {
     }
 
     // Print text
-    const struct MxuiFont* font = gMxuiFonts[FONT_NORMAL];
+    const struct DjuiFont* font = gDjuiFonts[0];
     if (font->textBeginDisplayList != NULL) {
         gSPDisplayList(gDisplayListHead++, font->textBeginDisplayList);
     }
@@ -226,11 +223,11 @@ static void crash_handler_produce_one_frame_callback(void) {
         s32 y = SCREEN_HEIGHT - 8 - text->y * aspectScale;
         gDPPipeSync(gDisplayListHead++);
         gDPSetEnvColor(gDisplayListHead++, text->r, text->g, text->b, 0xFF);
-        create_dl_translation_matrix(MXUI_MTX_PUSH, x, y, 0);
+        create_dl_translation_matrix(DJUI_MTX_PUSH, x, y, 0);
 
         // translate scale
         f32 fontSize = 10.0f * aspectScale;
-        create_dl_scale_matrix(MXUI_MTX_NOPUSH, fontSize, fontSize, 1.0f);
+        create_dl_scale_matrix(DJUI_MTX_NOPUSH, fontSize, fontSize, 1.0f);
 
         // set color
         gDPSetEnvColor(gDisplayListHead++, text->r, text->g, text->b, 0xFF);
@@ -243,18 +240,18 @@ static void crash_handler_produce_one_frame_callback(void) {
 
             if ((u8)*c <= 0x20 || (u8)*c >= 0x7F) {
                 addX += charWidth;
-                c = mxui_unicode_next_char(c);
+                c = djui_unicode_next_char(c);
                 continue;
             }
 
             if (addX != 0) {
-                create_dl_translation_matrix(MXUI_MTX_NOPUSH, addX, 0, 0);
+                create_dl_translation_matrix(DJUI_MTX_NOPUSH, addX, 0, 0);
                 addX = 0;
             }
             // render
             font->render_char(c);
-            create_dl_translation_matrix(MXUI_MTX_NOPUSH, charWidth, 0, 0);
-            c = mxui_unicode_next_char(c);
+            create_dl_translation_matrix(DJUI_MTX_NOPUSH, charWidth, 0, 0);
+            c = djui_unicode_next_char(c);
         }
 
         // pop
@@ -303,7 +300,7 @@ static void crash_handler(const int signalNum, siginfo_t *info, UNUSED ucontext_
     printf("Game crashed! preparing crash screen...\n");
     memset(sCrashHandlerText, 0, sizeof(sCrashHandlerText));
     CrashHandlerText *pText = &sCrashHandlerText[0];
-    gMxuiDisabled = true;
+    gDjuiDisabled = true;
 
     // Exception report
     crash_handler_set_text(8, -4, 0xFF, 0x80, 0x00, "%s", "Please report this crash with a consistent way to reproduce it.");
@@ -664,7 +661,7 @@ static void crash_handler(const int signalNum, siginfo_t *info, UNUSED ucontext_
             keyboard_on_text_input, keyboard_on_text_editing);
         WAPI.set_scroll_callback(mouse_on_scroll);
     }
-    if (!gGameInited) mxui_unicode_init();
+    if (!gGameInited) djui_unicode_init();
 
     // Main loop
     while (true) {

@@ -28,7 +28,7 @@
 #include "level_table.h"
 #include "pc/lua/utils/smlua_model_utils.h"
 #include "pc/lua/smlua.h"
-#include "pc/mxui/mxui_exports.h"
+#include "pc/djui/djui.h"
 #include "pc/debug_context.h"
 #include "game/hardcoded.h"
 #include "menu/intro_geo.h"

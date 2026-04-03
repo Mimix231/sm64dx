@@ -6,7 +6,6 @@
 
 #include "smlua.h"
 #include "pc/mods/mod.h"
-#include "pc/configfile.h"
 #include "pc/lua/utils/smlua_model_utils.h"
 
 // forward declare
@@ -106,14 +105,12 @@ enum LuaModMenuElementType {
     MOD_MENU_ELEMENT_CHECKBOX,
     MOD_MENU_ELEMENT_SLIDER,
     MOD_MENU_ELEMENT_INPUTBOX,
-    MOD_MENU_ELEMENT_BIND,
     MOD_MENU_ELEMENT_MAX
 };
 
 struct LuaHookedModMenuElement {
     enum LuaModMenuElementType element;
     char name[64];
-    char configKey[64];
     // use a union here?
     bool boolValue;
     u32 uintValue;
@@ -121,8 +118,6 @@ struct LuaHookedModMenuElement {
     u32 length;
     u32 sliderMin;
     u32 sliderMax;
-    unsigned int bindValue[MAX_BINDS];
-    unsigned int defaultBindValue[MAX_BINDS];
     int reference;
     struct Mod* mod;
     struct ModFile* modFile;

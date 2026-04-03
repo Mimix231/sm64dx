@@ -223,7 +223,7 @@ const char *sys_user_path(void)
         return NULL;
     }
 
-    LPCWSTR subdirs[] = { L"sm64dx", L"sm64coopdx", L"sm64ex-coop", NULL };
+    LPCWSTR subdirs[] = { L"sm64coopdx", L"sm64ex-coop", L"sm64coopdx", NULL };
 
     for (int i = 0; NULL != subdirs[i]; i++)
     {
@@ -252,8 +252,21 @@ const char *sys_user_path(void)
     return sys_windows_short_path_from_wcs(shortPath, SYS_MAX_PATH, widePath) ? shortPath : NULL;
 }
 
-const char *sys_resource_path(void) {
+const char *sys_package_path(void) {
     return sys_exe_path_dir();
+}
+
+const char *sys_resource_path(void) {
+    static char path[SYS_MAX_PATH];
+    if ('\0' != path[0]) { return path; }
+
+    const char *packagePath = sys_package_path();
+    if (packagePath && snprintf(path, sizeof(path), "%s/resources", packagePath) > 0 && fs_sys_dir_exists(path)) {
+        return path;
+    }
+
+    snprintf(path, sizeof(path), "%s", packagePath ? packagePath : "");
+    return path;
 }
 
 const char *sys_exe_path_dir(void)
@@ -301,7 +314,7 @@ const char *sys_user_path(void) {
     static char path[SYS_MAX_PATH] = { 0 };
     if ('\0' != path[0]) { return path; }
 
-    char const *subdirs[] = { "sm64dx", "sm64coopdx", "sm64ex-coop", NULL };
+    char const *subdirs[] = { "sm64coopdx", "sm64ex-coop", "sm64coopdx", NULL };
 
     char *sdlPath = NULL;
     for (int i = 0; NULL != subdirs[i]; i++)
@@ -330,7 +343,7 @@ const char *sys_user_path(void) {
     return path;
 }
 
-const char *sys_resource_path(void)
+const char *sys_package_path(void)
 {
 #ifdef __APPLE__ // Kinda lazy, but I don't know how to add CoreFoundation.framework
     static char path[SYS_MAX_PATH];
@@ -347,6 +360,20 @@ const char *sys_resource_path(void)
 #endif
 
     return sys_exe_path_dir();
+}
+
+const char *sys_resource_path(void)
+{
+    static char path[SYS_MAX_PATH];
+    if ('\0' != path[0]) { return path; }
+
+    const char *packagePath = sys_package_path();
+    if (packagePath && snprintf(path, sizeof(path), "%s/resources", packagePath) > 0 && fs_sys_dir_exists(path)) {
+        return path;
+    }
+
+    snprintf(path, sizeof(path), "%s", packagePath ? packagePath : "");
+    return path;
 }
 
 const char *sys_exe_path_dir(void) {
@@ -399,6 +426,23 @@ static void sys_fatal_impl(const char *msg) {
 
 const char *sys_user_path(void) {
     return ".";
+}
+
+const char *sys_package_path(void) {
+    return ".";
+}
+
+const char *sys_resource_path(void) {
+    static char path[SYS_MAX_PATH];
+    if ('\0' != path[0]) { return path; }
+
+    if (fs_sys_dir_exists("./resources")) {
+        snprintf(path, sizeof(path), "./resources");
+        return path;
+    }
+
+    snprintf(path, sizeof(path), ".");
+    return path;
 }
 
 const char *sys_exe_path(void) {

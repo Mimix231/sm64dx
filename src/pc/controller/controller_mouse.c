@@ -1,7 +1,6 @@
-#include "sm64.h"
 #include "controller_mouse.h"
-#include "game/game_init.h"
 #include "pc/gfx/gfx_pc.h"
+#include "pc/djui/djui.h"
 
 #ifdef WAPI_DXGI
 #define WIN32_LEAN_AND_MEAN
@@ -156,6 +155,7 @@ void controller_mouse_leave_relative(void) {
 }
 
 void mouse_on_scroll(float x, float y) {
+    djui_interactable_on_scroll(x, y);
     mouse_scroll_timestamp = gGlobalTimer;
     mouse_scroll_x += x;
     mouse_scroll_y += y;

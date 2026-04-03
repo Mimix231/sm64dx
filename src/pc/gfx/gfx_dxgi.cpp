@@ -2,6 +2,7 @@
 
 #include <stdint.h>
 #include <math.h>
+#include <cstring>
 
 #include <map>
 #include <set>
@@ -283,6 +284,11 @@ static LRESULT CALLBACK gfx_dxgi_wnd_proc(HWND h_wnd, UINT message, WPARAM w_par
     WCHAR wcsFileName[MAX_PATH];
     char szFileName[MAX_PATH];
 
+    auto is_rom_path = [](const char *path) {
+        size_t length = strlen(path);
+        return length >= 4 && _stricmp(&path[length - 4], ".z64") == 0;
+    };
+
     switch (message) {
         case WM_SIZE: {
             gfx_dxgi_on_resize();
@@ -337,7 +343,7 @@ static LRESULT CALLBACK gfx_dxgi_wnd_proc(HWND h_wnd, UINT message, WPARAM w_par
                 ofn.lpstrFilter = L"N64 ROM files (*.z64)\0*.z64\0";
                 ofn.lpstrFile = wcsFileName;
                 ofn.nMaxFile = MAX_PATH;
-                ofn.lpstrTitle = L"Select the \"Super Mario 64 (U) [!]\" ROM file..";
+                ofn.lpstrTitle = L"Select a vanilla SM64 or compatible SM64 ROM hack .z64 file..";
                 ofn.Flags = (OFN_DONTADDTORECENT | OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST);
 
                 wcsFileName[0] = L'\0';
@@ -354,7 +360,7 @@ static LRESULT CALLBACK gfx_dxgi_wnd_proc(HWND h_wnd, UINT message, WPARAM w_par
             for (UINT i = 0; i < nFiles; i++) {
                 if (0 != DragQueryFileW(hDrop, i, wcsFileName, MAX_PATH)) {
                     if (sys_windows_short_path_from_wcs(szFileName, MAX_PATH, wcsFileName)) {
-                        if (!gRomIsValid) {
+                        if (!gRomIsValid || is_rom_path(szFileName)) {
                             rom_on_drop_file(szFileName);
                         } else if (gGameInited) {
                             mod_import_file(szFileName);

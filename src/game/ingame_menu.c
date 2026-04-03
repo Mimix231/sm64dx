@@ -27,8 +27,9 @@
 #include "macros.h"
 #include "hardcoded.h"
 #include "pc/network/network.h"
-#include "pc/configfile.h"
-#include "pc/mxui/mxui_exports.h"
+#include "pc/djui/djui.h"
+#include "pc/djui/djui_panel.h"
+#include "pc/djui/djui_panel_pause.h"
 #include "pc/utils/misc.h"
 #include "data/dynos_mgr_builtin_externs.h"
 #include "hud.h"
@@ -2976,82 +2977,32 @@ s16 render_pause_courses_and_castle(void) {
             }
             break;
         case DIALOG_STATE_VERTICAL:
-            if (!gDjuiPanelPauseCreated && !gPauseMenuHidden) {
-                shade_screen();
-                render_pause_my_score_coins();
-                render_pause_red_coins();
-
-                /* Always allow exiting from course */
-                if (gLevelValues.pauseExitAnywhere || (gMarioStates[0].action & ACT_FLAG_PAUSE_EXIT)) {
-                    render_pause_course_options(99, 93, &gDialogLineNum, 15);
-                }
-
-#ifdef VERSION_EU
-                if (gPlayer1Controller->buttonPressed & (A_BUTTON | Z_TRIG | START_BUTTON))
-#else
-                if (gPlayer1Controller->buttonPressed & A_BUTTON
-                 || gPlayer1Controller->buttonPressed & START_BUTTON)
-#endif
-                {
-                    bool allowExit = true;
-                    if (gDialogLineNum == 2 || gDialogLineNum == 3) {
-                        smlua_call_event_hooks(HOOK_ON_PAUSE_EXIT, gDialogLineNum == 3, &allowExit);
-                    }
-                    if (allowExit) {
-                        level_set_transition(0, NULL);
-                        play_sound(SOUND_MENU_PAUSE_2, gGlobalSoundSource);
-                        gDialogBoxState = DIALOG_STATE_OPENING;
-                        gMenuMode = -1;
-
-                        if (gDialogLineNum == 2 || gDialogLineNum == 3) {
-                            num = gDialogLineNum;
-                        } else {
-                            num = 1;
-                        }
-
-                        return num;
-                    } else {
-                        play_sound(SOUND_MENU_CAMERA_BUZZ | (0xFF << 8), gGlobalSoundSource);
-                    }
-                }
-            }
             break;
         case DIALOG_STATE_HORIZONTAL:
-            if (!gDjuiPanelPauseCreated && !gPauseMenuHidden) {
-                shade_screen();
-                print_hud_pause_colorful_str();
-
-                if (gLevelValues.extendedPauseDisplay) {
-                    render_pause_castle_menu_box_extended(160, 143);
-                    render_pause_castle_main_strings_extended(84, 60);
-                } else {
-                    render_pause_castle_menu_box(160, 143);
-                    render_pause_castle_main_strings(104, 60);
-                }
-
-#ifdef VERSION_EU
-                if (gPlayer1Controller->buttonPressed & (A_BUTTON | Z_TRIG | START_BUTTON))
-#else
-                if (gPlayer1Controller->buttonPressed & A_BUTTON
-                 || gPlayer1Controller->buttonPressed & START_BUTTON)
-#endif
-                {
-                    level_set_transition(0, NULL);
-                    play_sound(SOUND_MENU_PAUSE_2, gGlobalSoundSource);
-                    gMenuMode = -1;
-                    gDialogBoxState = DIALOG_STATE_OPENING;
-
-                    return 1;
-                }
-          }
-          break;
+            break;
     }
 
     if (gDialogTextAlpha < 250) {
         gDialogTextAlpha += 25;
     }
 
+    if (!gPauseMenuHidden
+        && (gDialogBoxState == DIALOG_STATE_VERTICAL || gDialogBoxState == DIALOG_STATE_HORIZONTAL)
+        && !gDjuiPanelPauseCreated) {
+        djui_panel_pause_create(NULL);
+    }
+
     if (gDjuiPanelPauseCreated && !gDjuiInPlayerMenu) { shade_screen(); }
+
+    num = djui_panel_pause_consume_result();
+    if (num != 0) {
+        level_set_transition(0, NULL);
+        play_sound(SOUND_MENU_PAUSE_2, gGlobalSoundSource);
+        gDialogBoxState = 0;
+        gMenuMode = -1;
+        return num;
+    }
+
     if ((gPlayer1Controller->buttonPressed & L_TRIG) && network_allow_mod_dev_mode()) {
         network_mod_dev_mode_reload();
     }
@@ -3172,7 +3123,7 @@ void play_star_fanfare_and_flash_hud(s32 arg, u8 starNum) {
             gFanFareDebounce = 30 * 5;
             play_star_fanfare();
         }
-        gHudFlash = configReduceHudFlash ? -1 : arg;
+        gHudFlash = arg;
     }
 }
 

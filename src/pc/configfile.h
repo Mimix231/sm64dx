@@ -89,7 +89,6 @@ extern unsigned int configKeyConsole[MAX_BINDS];
 extern unsigned int configKeyPrevPage[MAX_BINDS];
 extern unsigned int configKeyNextPage[MAX_BINDS];
 extern unsigned int configKeyDisconnect[MAX_BINDS];
-extern unsigned int configKeyGameMenu[MAX_BINDS];
 extern unsigned int configStickDeadzone;
 extern unsigned int configRumbleStrength;
 extern unsigned int configGamepadNumber;
@@ -132,8 +131,6 @@ extern bool         configCtxProfiler;
 extern char         configPlayerName[MAX_CONFIG_STRING];
 extern unsigned int configPlayerModel;
 extern struct PlayerPalette configPlayerPalette;
-extern char         configPlayerMoonosPack[MAX_CONFIG_STRING];
-extern char         configPlayerMoonosGeo[MAX_CONFIG_STRING];
 // coop settings
 extern unsigned int configAmountOfPlayers;
 extern bool         configBubbleDeath;
@@ -160,10 +157,6 @@ extern char         configLanguage[MAX_CONFIG_STRING];
 extern bool         configForce4By3;
 extern bool         configDynosLocalPlayerModelOnly;
 extern unsigned int configPvpType;
-extern bool         configFirstBootCompleted;
-extern unsigned int configAccessibilityPreset;
-extern bool         configReduceCameraShake;
-extern bool         configReduceHudFlash;
 // CoopNet settings
 extern char         configCoopNetIp[MAX_CONFIG_STRING];
 extern unsigned int configCoopNetPort;

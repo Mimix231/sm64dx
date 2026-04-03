@@ -13,7 +13,7 @@
 #include "level_commands.h"
 #include "engine/math_util.h"
 #include "engine/level_script.h"
-#include "pc/mxui/mxui_assets.h"
+#include "pc/djui/djui_hud_utils.h"
 #include "pc/utils/misc.h"
 #include "include/level_misc_macros.h"
 #include "include/macro_presets.h"
@@ -788,13 +788,13 @@ int smlua_func_log_to_console(lua_State* L) {
     const char* message = smlua_to_string(L, 1);
     if (!gSmLuaConvertSuccess) { LOG_LUA("log_to_console: Failed to convert parameter 1 for function"); return 0; }
 
-    int level = MXUI_CONSOLE_MESSAGE_INFO;
+    enum ConsoleMessageLevel level = CONSOLE_MESSAGE_INFO;
     if (paramCount >= 2) {
         level = smlua_to_integer(L, 2);
         if (!gSmLuaConvertSuccess) { LOG_LUA("log_to_console: Failed to convert parameter 2 for function"); return 0; }
     }
 
-    mxui_console_message_create(message, (int)level);
+    djui_console_message_create(message, level);
 
     return 1;
 }

@@ -40,7 +40,7 @@ void network_send_change_level(void) {
         }
     }
 
-    if (gNetworkType == NT_SERVER) {
+    if (gNetworkType != NT_CLIENT) {
         player_changed_level(gNetworkPlayerLocal, gCurrCourseNum, gCurrActStarNum, gCurrLevelNum, gCurrAreaIndex);
         return;
     }

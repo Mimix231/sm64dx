@@ -1,5 +1,5 @@
 #include "discord.h"
-#include "pc/mxui/mxui_exports.h"
+#include "pc/djui/djui.h"
 #include "pc/crash_handler.h"
 #include "pc/debuglog.h"
 #include "pc/platform.h"

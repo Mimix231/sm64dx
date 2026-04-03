@@ -10,7 +10,6 @@
 #include "pc/configfile.h"
 #include "pc/controller/controller_mouse.h"
 #include "pc/lua/utils/smlua_camera_utils.h"
-#include "pc/mxui/mxui.h"
 
 #if defined(__MINGW32__) && !defined(__MINGW64_VERSION_MAJOR)
 //quick and dirty fix for some older MinGW.org mingwrt
@@ -254,7 +253,7 @@ static void newcam_rotate_button(void) {
     }
 
     // Mouse control
-    if (gNewCamera.isMouse && !gDjuiInMainMenu && !mxui_is_active()) {
+    if (gNewCamera.isMouse && !gDjuiInMainMenu && !gDjuiChatBoxFocus && !gDjuiConsoleFocus) {
         if (!gNewCamera.useDPad || !gNewCamera.directionLocked) {
             gNewCamera.yaw += newcam_ivrt(0) * mouse_x * 16.f * (gNewCamera.sensitivityX / 250.f);
         }

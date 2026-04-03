@@ -13,7 +13,7 @@
 struct CLIOptions gCLIOpts;
 
 static void print_help(void) {
-    printf("sm64dx\n");
+    printf("sm64coopdx\n");
 #if defined(_WIN32) || defined(_WIN64)
     printf("--console                 Enables the Windows console.\n");
 #endif
@@ -30,17 +30,8 @@ static void print_help(void) {
     printf("--skip-update-check       Skips the update check when loading the game.\n");
     printf("--no-discord              Disables discord integration.\n");
     printf("--disable-mods            Disables all mods that are already enabled.\n");
-    printf("--safe-mode               Starts with all mods disabled for recovery.\n");
     printf("--enable-mod MODNAME      Enables a mod.\n");
     printf("--headless                Enable Headless mode.");
-}
-
-static void warn_offline_only(void) {
-    static bool sWarnedOfflineOnly = false;
-    if (!sWarnedOfflineOnly) {
-        fprintf(stderr, "sm64dx is offline-only. Network launch options are ignored.\n");
-        sWarnedOfflineOnly = true;
-    }
 }
 
 static inline int arg_string(const char *name, const char *value, char *target, int maxLength) {
@@ -88,17 +79,17 @@ bool parse_cli_opts(int argc, char* argv[]) {
         } else if (!strcmp(argv[i], "--skip-intro")) {
             gCLIOpts.skipIntro = true;
         } else if (!strcmp(argv[i], "--server") && (i + 1) < argc) {
-            warn_offline_only();
             i++;
+            fprintf(stderr, "--server is no longer supported in sm64dx. Starting offline.\n");
         } else if (!strcmp(argv[i], "--client") && (((i + 1) < argc) || (i + 2) < argc)) {
-            warn_offline_only();
             i++;
-            if ((i + 2) < argc) {
+            if ((i + 1) < argc && argv[i + 1][0] != '-') {
                 i++;
             }
+            fprintf(stderr, "--client is no longer supported in sm64dx. Starting offline.\n");
         } else if (!strcmp(argv[i], "--coopnet") && (i + 1) < argc && argv[i + 1][0] != '-') {
-            warn_offline_only();
             i++;
+            fprintf(stderr, "--coopnet is no longer supported in sm64dx. Starting offline.\n");
         } else if (!strcmp(argv[i], "--playername") && (i + 1) < argc) {
             arg_string("--playername <playername>", argv[++i], gCLIOpts.playerName, MAX_CONFIG_STRING);
         } else if (!strcmp(argv[i], "--playercount") && (i + 1) < argc) {
@@ -108,8 +99,6 @@ bool parse_cli_opts(int argc, char* argv[]) {
         } else if (!strcmp(argv[i], "--no-discord")) {
             gCLIOpts.noDiscord = true;
         } else if (!strcmp(argv[i], "--disable-mods")) {
-            gCLIOpts.disableMods = true;
-        } else if (!strcmp(argv[i], "--safe-mode")) {
             gCLIOpts.disableMods = true;
         } else if (!strcmp(argv[i], "--enable-mod") && (i + 1) < argc) {
             gCLIOpts.enabledModsCount++;

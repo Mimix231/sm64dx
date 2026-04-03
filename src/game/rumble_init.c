@@ -5,7 +5,7 @@
 #include "main.h"
 #include "rumble_init.h"
 #include "object_helpers.h"
-#include "pc/mxui/mxui_exports.h"
+#include "pc/djui/djui.h"
 
 s8 D_SH_8031D8F8[0x60];
 
