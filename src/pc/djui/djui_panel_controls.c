@@ -8,6 +8,12 @@
 #include "pc/controller/controller_api.h"
 #include "pc/controller/controller_sdl.h"
 
+#if defined(HAVE_SDL3)
+#include <SDL3/SDL.h>
+#elif defined(HAVE_SDL2)
+#include <SDL2/SDL.h>
+#endif
+
 void djui_panel_controls_value_change(UNUSED struct DjuiBase* caller) {
     controller_reconfigure();
 }
@@ -42,7 +48,24 @@ void djui_panel_controls_create(struct DjuiBase* caller) {
 #endif
         djui_checkbox_create(body, DLANG(MISC, USE_STANDARD_KEY_BINDINGS_CHAT), &configUseStandardKeyBindingsChat, NULL);
 
-#ifdef HAVE_SDL2
+#if defined(HAVE_SDL3)
+        int numJoys = 0;
+        SDL_JoystickID *joysticks = SDL_GetJoysticks(&numJoys);
+        if (numJoys == 0) { numJoys = 1; }
+
+        char** gamepadChoices = calloc(numJoys, sizeof(char *));
+
+        for (int i = 0; i < numJoys; i++) {
+            const char* joystickName = (joysticks != NULL) ? SDL_GetJoystickNameForID(joysticks[i]) : NULL;
+            if (joystickName == NULL) {
+                joystickName = "Unknown";
+            }
+            gamepadChoices[i] = strdup(joystickName);
+        }
+        if (joysticks != NULL) {
+            SDL_free(joysticks);
+        }
+#elif defined(HAVE_SDL2)
         int numJoys = SDL_NumJoysticks();
         if (numJoys == 0) { numJoys = 1; }
 

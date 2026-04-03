@@ -1,11 +1,11 @@
 #include <ultra64.h>
 #include "macros.h"
 
+#include "sm64dx_ui.h"
 #include "buffers/buffers.h"
 #include "main.h"
 #include "rumble_init.h"
 #include "object_helpers.h"
-#include "pc/djui/djui.h"
 
 s8 D_SH_8031D8F8[0x60];
 
@@ -136,7 +136,7 @@ static void update_rumble_data_queue(void) {
 }
 
 void queue_rumble_data(s16 a0, s16 a1) {
-    if (gCurrDemoInput != NULL || gDjuiInMainMenu) {
+    if (gCurrDemoInput != NULL || sm64dx_ui_is_in_main_menu()) {
         return;
     }
 

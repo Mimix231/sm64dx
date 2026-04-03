@@ -1,4 +1,4 @@
-![sm64dx Logo](textures/segment2/custom_coopdx_logo.rgba32.png)
+![sm64dx Logo](textures/segment2/custom_sm64dx_logo.rgba32.png)
 
 sm64dx is an offline-first singleplayer fork of the Super Mario 64 PC port. It keeps the Lua modding workflow, custom character support, and moddable front end from the coop lineage, but removes the online-first flow in favor of a cleaner local experience.
 

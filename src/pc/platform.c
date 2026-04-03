@@ -305,10 +305,14 @@ static void sys_fatal_impl(const char *msg) {
     exit(1);
 }
 
-#elif defined(HAVE_SDL2)
+#elif defined(HAVE_SDL3) || defined(HAVE_SDL2)
 
 // we can just ask SDL for most of this shit if we have it
+#if defined(HAVE_SDL3)
+#include <SDL3/SDL.h>
+#else
 #include <SDL2/SDL.h>
+#endif
 
 const char *sys_user_path(void) {
     static char path[SYS_MAX_PATH] = { 0 };

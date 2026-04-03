@@ -7,10 +7,7 @@
 #include "object_constants.h"
 #include "behavior_table.h"
 #include "pc/configfile.h"
-#include "pc/djui/djui.h"
 #include "pc/djui/djui_panel.h"
-#include "pc/djui/djui_hud_utils.h"
-#include "pc/djui/djui_panel_main.h"
 #include "pc/utils/misc.h"
 #include "pc/lua/smlua.h"
 #include "pc/lua/utils/smlua_model_utils.h"
@@ -628,7 +625,6 @@ void network_mod_dev_mode_reload(void) {
     LOG_CONSOLE("===================================================");
 }
 
-
 void network_shutdown(bool sendLeaving, bool exiting, bool popup, bool reconnecting) {
     smlua_call_event_hooks(HOOK_ON_EXIT);
 
@@ -666,7 +662,6 @@ void network_shutdown(bool sendLeaving, bool exiting, bool popup, bool reconnect
     gOverrideEeprom = NULL;
     extern u8 gOverrideFreezeCamera;
     gOverrideFreezeCamera = false;
-    gDjuiHudLockMouse = false;
     gOverrideNear = 0;
     gOverrideFar = 0;
     gOverrideFOV = 0;
@@ -746,12 +741,6 @@ void network_shutdown(bool sendLeaving, bool exiting, bool popup, bool reconnect
     init_mario_from_save_file();
 
     djui_panel_shutdown();
-    extern bool gDjuiInMainMenu;
-    if (!gDjuiInMainMenu) {
-        gDjuiInMainMenu = true;
-        djui_panel_main_create(NULL);
-    }
-    djui_lua_error_clear();
 
 #ifdef DISCORD_SDK
     if (gDiscordInitialized) {

@@ -5,8 +5,6 @@
 
 #include "types.h"
 
-#include "pc/djui/djui.h"
-
 #define TIMER_CONTROL_SHOW  0
 #define TIMER_CONTROL_START 1
 #define TIMER_CONTROL_STOP  2
@@ -216,6 +214,6 @@ void fake_lvl_init_from_save_file(void);
 void lvl_skip_credits(void);
 
 void update_menu_level(void);
-void stop_demo(UNUSED struct DjuiBase* caller);
+void stop_demo(void);
 
 #endif // LEVEL_UPDATE_H

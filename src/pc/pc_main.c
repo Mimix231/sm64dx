@@ -73,7 +73,9 @@
 #include <windows.h>
 #endif
 
-#ifdef HAVE_SDL2
+#ifdef HAVE_SDL3
+#include <SDL3/SDL.h>
+#elif defined(HAVE_SDL2)
 #include <SDL2/SDL.h>
 #endif
 
@@ -213,7 +215,19 @@ static s32 get_num_frames_to_draw(f64 t, u32 frameLimit) {
 }
 
 static u32 get_display_refresh_rate() {
-#ifdef HAVE_SDL2
+#if defined(HAVE_SDL3)
+    static u32 refreshRate = 0;
+    if (!refreshRate) {
+        SDL_DisplayID displayId = SDL_GetPrimaryDisplay();
+        const SDL_DisplayMode *mode = SDL_GetCurrentDisplayMode(displayId);
+        if (mode != NULL) {
+            if (mode->refresh_rate > 0) { refreshRate = (u32) mode->refresh_rate; }
+        } else {
+            refreshRate = 60;
+        }
+    }
+    return refreshRate;
+#elif defined(HAVE_SDL2)
     static u32 refreshRate = 0;
     if (!refreshRate) {
         SDL_DisplayMode mode;
@@ -570,7 +584,7 @@ int main(int argc, char *argv[]) {
 
     // initialize sound outside threads
     if (gCLIOpts.headless) audio_api = &audio_null;
-#if defined(AAPI_SDL1) || defined(AAPI_SDL2)
+#if defined(AAPI_SDL1) || defined(AAPI_SDL2) || defined(AAPI_SDL3)
     if (!audio_api && audio_sdl.init()) audio_api = &audio_sdl;
 #endif
     if (!audio_api) audio_api = &audio_null;
@@ -585,10 +599,6 @@ int main(int argc, char *argv[]) {
     // initialize djui
     djui_init();
     djui_unicode_init();
-    djui_init_late();
-    djui_console_message_dequeue();
-
-    show_update_popup();
 
     // sm64dx boots offline-only.
     network_init(NT_NONE, false);
@@ -609,9 +619,9 @@ int main(int argc, char *argv[]) {
         CTX_END(CTX_TOTAL);
 
 #ifdef DEVELOPMENT
-        djui_ctx_display_update();
+
 #endif
-        djui_lua_profiler_update();
+
     }
 
     return 0;

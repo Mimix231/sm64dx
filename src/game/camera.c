@@ -35,7 +35,6 @@
 #include "pc/configfile.h"
 #include "pc/network/network.h"
 #include "pc/lua/smlua_hooks.h"
-#include "pc/djui/djui.h"
 #include "first_person_cam.h"
 #include "rendering_graph_node.h"
 
@@ -3181,7 +3180,7 @@ void update_camera(struct Camera *c) {
     gCamera = c;
     update_camera_hud_status(c);
 
-    if ((gOverrideFreezeCamera || get_first_person_enabled()) && !gDjuiInMainMenu) {
+    if ((gOverrideFreezeCamera || get_first_person_enabled()) && !sm64dx_ui_is_in_main_menu()) {
         return;
     }
 
@@ -3705,7 +3704,7 @@ void zoom_out_if_paused_and_outside(struct GraphNodeCamera *camera) {
         areaMaskIndex = 0;
         areaBit = 0;
     }
-    if (gCameraMovementFlags & CAM_MOVE_PAUSE_SCREEN && !gDjuiInPlayerMenu && !get_first_person_enabled()) {
+    if (gCameraMovementFlags & CAM_MOVE_PAUSE_SCREEN && !sm64dx_ui_is_in_player_menu() && !get_first_person_enabled()) {
         if (sFramesPaused >= 2) {
             if (sZoomOutAreaMasks[areaMaskIndex] & areaBit) {
 
@@ -7450,7 +7449,7 @@ void reset_pan_distance(UNUSED struct Camera *c) {
  * Easter egg: the player 2 (1) controller can move the camera's focus in the ending and credits.
  */
 void player2_rotate_cam(struct Camera *c, s16 minPitch, s16 maxPitch, s16 minYaw, s16 maxYaw) {
-    if (gDjuiInMainMenu) { return; }
+    if (sm64dx_ui_is_in_main_menu()) { return; }
 
     f32 distCamToFocus;
     s16 pitch, yaw, pitchCap;
@@ -10933,8 +10932,6 @@ BAD_RETURN(s32) cutscene_door_mode(struct Camera *c) {
     }
 }
 
-// coop specific
-extern struct DjuiText* gDjuiPaletteToggle;
 void cutscene_palette_editor(struct Camera *c) {
     if (!c) { return; }
     struct MarioState* m = gMarioState;
@@ -10945,7 +10942,7 @@ void cutscene_palette_editor(struct Camera *c) {
         c->paletteEditorCapState = (m->flags & MARIO_CAP_ON_HEAD) ? 1 : 2;
     }
 
-    if (!gDjuiInPlayerMenu) {
+    if (!sm64dx_ui_is_in_player_menu()) {
         mario_exit_palette_editor(m, c);
         gCutsceneTimer = CUTSCENE_STOP;
         c->cutscene = 0;
@@ -10967,15 +10964,12 @@ void cutscene_palette_editor(struct Camera *c) {
     }
 
     // Hide text if it is not possible to toggle cap
-    if (gDjuiPaletteToggle) {
-        djui_base_set_visible(
-            &gDjuiPaletteToggle->base,
-            (
-                m->action == ACT_IDLE ||
-                m->action == ACT_PALETTE_EDITOR_CAP 
-            ) && !capMissing
-        );
-    }
+    sm64dx_ui_set_palette_toggle_visible(
+        (
+            m->action == ACT_IDLE ||
+            m->action == ACT_PALETTE_EDITOR_CAP
+        ) && !capMissing
+    );
 
     c->pos[0] = m->pos[0] + (0x200 * sins(m->faceAngle[1]));
     c->pos[1] = m->pos[1] + 0x80;

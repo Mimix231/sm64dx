@@ -14,7 +14,7 @@ extern "C" {
 #include "gfx/gfx_sdl.h"
 #include "gfx/gfx_dummy.h"
 
-#if defined(WAPI_SDL1) || defined(WAPI_SDL2)
+#if defined(WAPI_SDL1) || defined(WAPI_SDL2) || defined(WAPI_SDL3)
 # define WAPI gfx_sdl
 #elif defined(WAPI_DXGI)
 # define WAPI gfx_dxgi

@@ -1,4 +1,4 @@
-#ifdef CAPI_SDL2
+#if defined(CAPI_SDL3) || defined(CAPI_SDL2)
 
 #include <stdio.h>
 #include <stdint.h>
@@ -9,7 +9,11 @@
 #include <windows.h>
 #endif
 
+#if defined(HAVE_SDL3)
+#include <SDL3/SDL.h>
+#else
 #include <SDL2/SDL.h>
+#endif
 
 #include <ultra64.h>
 
@@ -24,10 +28,8 @@
 #include "game/level_update.h"
 #include "game/first_person_cam.h"
 #include "game/bettercamera.h"
+#include "game/sm64dx_ui.h"
 #include "pc/lua/utils/smlua_misc_utils.h"
-#include "pc/djui/djui.h"
-#include "pc/djui/djui_panel_pause.h"
-#include "pc/djui/djui_hud_utils.h"
 
 #define MAX_JOYBINDS 32
 #define MAX_MOUSEBUTTONS 8 // arbitrary
@@ -36,7 +38,11 @@
 
 static bool init_ok = false;
 static bool haptics_enabled = false;
+#if defined(HAVE_SDL3)
+static SDL_Gamepad *sdl_cntrl = NULL;
+#else
 static SDL_GameController *sdl_cntrl = NULL;
+#endif
 static SDL_Joystick *sdl_joystick = NULL;
 static SDL_Haptic *sdl_haptic = NULL;
 
@@ -51,6 +57,26 @@ static bool joy_buttons[MAX_JOYBUTTONS] = { false };
 static u32 last_mouse = VK_INVALID;
 static u32 last_joybutton = VK_INVALID;
 static u32 last_gamepad = 0;
+
+#if defined(HAVE_SDL3)
+static SDL_JoystickID controller_sdl_get_instance_id(const u32 index) {
+    int count = 0;
+    SDL_JoystickID *joysticks = SDL_GetJoysticks(&count);
+    SDL_JoystickID instanceId = 0;
+    if (joysticks != NULL && index < (u32) count) {
+        instanceId = joysticks[index];
+    }
+    if (joysticks != NULL) {
+        SDL_free(joysticks);
+    }
+    return instanceId;
+}
+
+static const char *controller_sdl_get_instance_name(SDL_JoystickID instanceId) {
+    const char *name = SDL_GetJoystickNameForID(instanceId);
+    return (name != NULL) ? name : "Unknown";
+}
+#endif
 
 static s16 invert_s16(s16 val) {
     if (val == -0x8000) return 0x7FFF;
@@ -108,7 +134,11 @@ static void controller_sdl_init(void) {
     }
     sBackgroundGamepad = configBackgroundGamepad;
 
+    #if defined(HAVE_SDL3)
+    if (!SDL_Init(SDL_INIT_GAMEPAD | SDL_INIT_EVENTS)) {
+    #else
     if (SDL_Init(SDL_INIT_GAMECONTROLLER | SDL_INIT_EVENTS) != 0) {
+    #endif
         fprintf(stderr, "SDL init error: %s\n", SDL_GetError());
         return;
     }
@@ -118,15 +148,27 @@ static void controller_sdl_init(void) {
     WIN_UpdateKeymap();
 #endif
 
+    #if defined(HAVE_SDL3)
+    haptics_enabled = SDL_InitSubSystem(SDL_INIT_HAPTIC);
+    #else
     haptics_enabled = (SDL_InitSubSystem(SDL_INIT_HAPTIC) == 0);
+    #endif
 
     // try loading an external gamecontroller mapping file
     uint64_t gcsize = 0;
     void *gcdata = fs_load_file("gamecontrollerdb.txt", &gcsize);
     if (gcdata && gcsize) {
+        #if defined(HAVE_SDL3)
+        SDL_IOStream *rw = SDL_IOFromConstMem(gcdata, gcsize);
+        #else
         SDL_RWops *rw = SDL_RWFromConstMem(gcdata, gcsize);
+        #endif
         if (rw) {
+            #if defined(HAVE_SDL3)
+            int nummaps = SDL_AddGamepadMappingsFromIO(rw, true);
+            #else
             int nummaps = SDL_GameControllerAddMappingsFromRW(rw, SDL_TRUE);
+            #endif
             if (nummaps >= 0)
                 printf("loaded %d controller mappings from 'gamecontrollerdb.txt'\n", nummaps);
         }
@@ -142,37 +184,49 @@ static void controller_sdl_init(void) {
     mouse_init_ok = true;
 }
 
-static SDL_Haptic *controller_sdl_init_haptics(const int joy) {
+static SDL_Haptic *controller_sdl_init_haptics(SDL_Joystick *joystick, const char *name) {
     if (!haptics_enabled) return NULL;
 
-    SDL_Haptic *hap = SDL_HapticOpen(joy);
+    if (joystick == NULL) return NULL;
+
+    #if defined(HAVE_SDL3)
+    SDL_Haptic *hap = SDL_OpenHapticFromJoystick(joystick);
+    #else
+    SDL_Haptic *hap = SDL_HapticOpenFromJoystick(joystick);
+    #endif
     if (!hap) return NULL;
 
-    if (SDL_HapticRumbleSupported(hap) != SDL_TRUE) {
+    #if defined(HAVE_SDL3)
+    if (!SDL_HapticRumbleSupported(hap)) {
+        SDL_CloseHaptic(hap);
+        return NULL;
+    }
+
+    if (!SDL_InitHapticRumble(hap)) {
+        SDL_CloseHaptic(hap);
+        return NULL;
+    }
+    #else
+    if (!SDL_HapticRumbleSupported(hap)) {
         SDL_HapticClose(hap);
         return NULL;
     }
 
-    if (SDL_HapticRumbleInit(hap) != 0) {
+    if (!SDL_HapticRumbleInit(hap)) {
         SDL_HapticClose(hap);
         return NULL;
     }
+    #endif
 
-    printf("Controller %s has haptics support, rumble enabled\n", SDL_JoystickNameForIndex(joy));
+    printf("Controller %s has haptics support, rumble enabled\n", name);
     return hap;
 }
 
 static inline void update_button(const int i, const bool new) {
     const bool pressed = !joy_buttons[i] && new;
-    const bool unpressed = joy_buttons[i] && !new;
     joy_buttons[i] = new;
     if (pressed) {
         last_joybutton = i;
-        djui_panel_pause_disconnect_key_update(VK_BASE_SDL_GAMEPAD + i);
-        djui_interactable_on_key_down(VK_BASE_SDL_GAMEPAD + i);
-    }
-    if (unpressed) {
-        djui_interactable_on_key_up(VK_BASE_SDL_GAMEPAD + i);
     }
 }
 
@@ -180,7 +234,13 @@ extern s16 gMenuMode;
 static void controller_sdl_read(OSContPad *pad) {
     if (!init_ok) { return; }
 
-    if ((gNewCamera.isMouse || get_first_person_enabled() || gDjuiHudLockMouse) && !is_game_paused() && !gDjuiPanelPauseCreated && !gDjuiInMainMenu && !gDjuiChatBoxFocus && !gDjuiConsoleFocus && WAPI.has_focus()) {
+    if ((gNewCamera.isMouse || get_first_person_enabled())
+        && !is_game_paused()
+        && !sm64dx_ui_pause_menu_is_created()
+        && !sm64dx_ui_is_in_main_menu()
+        && !sm64dx_ui_is_chat_box_focused()
+        && !sm64dx_ui_is_console_focused()
+        && WAPI.has_focus()) {
         controller_mouse_enter_relative();
     } else {
         controller_mouse_leave_relative();
@@ -190,9 +250,9 @@ static void controller_sdl_read(OSContPad *pad) {
     controller_mouse_read_relative();
     u32 mouse = mouse_buttons;
 
-    if (!gInteractableOverridePad) {
+    if (!sm64dx_ui_uses_interactable_pad()) {
         for (u32 i = 0; i < num_mouse_binds; ++i)
-            if (mouse & SDL_BUTTON(mouse_binds[i][0]))
+            if (mouse & SDL_BUTTON_MASK(mouse_binds[i][0]))
                 pad->button |= mouse_binds[i][1];
     }
     // remember buttons that changed from 0 to 1
@@ -205,34 +265,101 @@ static void controller_sdl_read(OSContPad *pad) {
 
     if (configDisableGamepads) { return; }
 
+    #if defined(HAVE_SDL3)
+    SDL_UpdateGamepads();
+    #else
     SDL_GameControllerUpdate();
+    #endif
 
+    #if defined(HAVE_SDL3)
+    if (sdl_cntrl != NULL && !SDL_GamepadConnected(sdl_cntrl)) {
+    #else
     if (sdl_cntrl != NULL && !SDL_GameControllerGetAttached(sdl_cntrl)) {
-        SDL_HapticClose(sdl_haptic);
+    #endif
+        if (sdl_haptic) {
+            #if defined(HAVE_SDL3)
+            SDL_CloseHaptic(sdl_haptic);
+            #else
+            SDL_HapticClose(sdl_haptic);
+            #endif
+        }
+        #if defined(HAVE_SDL3)
+        SDL_CloseGamepad(sdl_cntrl);
+        #else
         SDL_GameControllerClose(sdl_cntrl);
+        #endif
         sdl_cntrl = NULL;
         sdl_haptic = NULL;
     }
 
     if ((!sdl_cntrl && !sdl_joystick) || last_gamepad != configGamepadNumber) {
-        if (sdl_haptic) { SDL_HapticClose(sdl_haptic); sdl_haptic = NULL; }
-        if (sdl_cntrl) { SDL_GameControllerClose(sdl_cntrl); sdl_cntrl = NULL; }
-        if (sdl_joystick) { SDL_JoystickClose(sdl_joystick); sdl_joystick = NULL; }
+        if (sdl_haptic) {
+            #if defined(HAVE_SDL3)
+            SDL_CloseHaptic(sdl_haptic);
+            #else
+            SDL_HapticClose(sdl_haptic);
+            #endif
+            sdl_haptic = NULL;
+        }
+        if (sdl_cntrl) {
+            #if defined(HAVE_SDL3)
+            SDL_CloseGamepad(sdl_cntrl);
+            #else
+            SDL_GameControllerClose(sdl_cntrl);
+            #endif
+            sdl_cntrl = NULL;
+        }
+        if (sdl_joystick) {
+            #if defined(HAVE_SDL3)
+            SDL_CloseJoystick(sdl_joystick);
+            #else
+            SDL_JoystickClose(sdl_joystick);
+            #endif
+            sdl_joystick = NULL;
+        }
         last_gamepad = configGamepadNumber;
+        #if defined(HAVE_SDL3)
+        SDL_JoystickID instanceId = controller_sdl_get_instance_id(configGamepadNumber);
+        if (instanceId == 0) { return; }
+        if (SDL_IsGamepad(instanceId)) {
+            sdl_cntrl = SDL_OpenGamepad(instanceId);
+            if (sdl_cntrl != NULL) {
+                sdl_haptic = controller_sdl_init_haptics(SDL_GetGamepadJoystick(sdl_cntrl),
+                    controller_sdl_get_instance_name(instanceId));
+            }
+        } else {
+            sdl_joystick = SDL_OpenJoystick(instanceId);
+            if (!sdl_joystick) { return; }
+            sdl_haptic = controller_sdl_init_haptics(sdl_joystick, controller_sdl_get_instance_name(instanceId));
+        }
+        #else
         if (SDL_IsGameController(configGamepadNumber)) {
             sdl_cntrl = SDL_GameControllerOpen(configGamepadNumber);
             if (sdl_cntrl != NULL) {
-                sdl_haptic = controller_sdl_init_haptics(configGamepadNumber);
+                sdl_haptic = controller_sdl_init_haptics(SDL_GameControllerGetJoystick(sdl_cntrl),
+                    SDL_JoystickNameForIndex(configGamepadNumber));
             }
         } else {
             sdl_joystick = SDL_JoystickOpen(configGamepadNumber);
             if (!sdl_joystick) { return; }
+            sdl_haptic = controller_sdl_init_haptics(sdl_joystick, SDL_JoystickNameForIndex(configGamepadNumber));
         }
+        #endif
     }
 
     int16_t leftx = 0, lefty = 0, rightx = 0, righty = 0;
     int16_t ltrig = 0, rtrig = 0;
     if (sdl_cntrl) {
+        #if defined(HAVE_SDL3)
+        leftx = SDL_GetGamepadAxis(sdl_cntrl, SDL_GAMEPAD_AXIS_LEFTX);
+        lefty = SDL_GetGamepadAxis(sdl_cntrl, SDL_GAMEPAD_AXIS_LEFTY);
+        rightx = SDL_GetGamepadAxis(sdl_cntrl, SDL_GAMEPAD_AXIS_RIGHTX);
+        righty = SDL_GetGamepadAxis(sdl_cntrl, SDL_GAMEPAD_AXIS_RIGHTY);
+        ltrig = SDL_GetGamepadAxis(sdl_cntrl, SDL_GAMEPAD_AXIS_LEFT_TRIGGER);
+        rtrig = SDL_GetGamepadAxis(sdl_cntrl, SDL_GAMEPAD_AXIS_RIGHT_TRIGGER);
+        for (u32 i = 0; i < SDL_GAMEPAD_BUTTON_COUNT; ++i) {
+            const bool new = SDL_GetGamepadButton(sdl_cntrl, (SDL_GamepadButton) i);
+        #else
         leftx = SDL_GameControllerGetAxis(sdl_cntrl, SDL_CONTROLLER_AXIS_LEFTX);
         lefty = SDL_GameControllerGetAxis(sdl_cntrl, SDL_CONTROLLER_AXIS_LEFTY);
         rightx = SDL_GameControllerGetAxis(sdl_cntrl, SDL_CONTROLLER_AXIS_RIGHTX);
@@ -241,26 +368,54 @@ static void controller_sdl_read(OSContPad *pad) {
         rtrig = SDL_GameControllerGetAxis(sdl_cntrl, SDL_CONTROLLER_AXIS_TRIGGERRIGHT);
         for (u32 i = 0; i < SDL_CONTROLLER_BUTTON_MAX; ++i) {
             const bool new = SDL_GameControllerGetButton(sdl_cntrl, i);
+        #endif
             update_button(i, new);
         }
     } else if (sdl_joystick) {
+        #if defined(HAVE_SDL3)
+        int axis_count = SDL_GetNumJoystickAxes(sdl_joystick);
+        #else
         int axis_count = SDL_JoystickNumAxes(sdl_joystick);
+        #endif
         if (axis_count >= 2) {
+            #if defined(HAVE_SDL3)
+            leftx = SDL_GetJoystickAxis(sdl_joystick, 0);
+            lefty = SDL_GetJoystickAxis(sdl_joystick, 1);
+            #else
             leftx = SDL_JoystickGetAxis(sdl_joystick, 0);
             lefty = SDL_JoystickGetAxis(sdl_joystick, 1);
+            #endif
         }
         if (axis_count >= 4) {
+            #if defined(HAVE_SDL3)
+            rightx = SDL_GetJoystickAxis(sdl_joystick, 2);
+            righty = SDL_GetJoystickAxis(sdl_joystick, 5);
+            #else
             rightx = SDL_JoystickGetAxis(sdl_joystick, 2);
             righty = SDL_JoystickGetAxis(sdl_joystick, 5); // Specific to N64 controller
+            #endif
         }
         if (axis_count >= 6) {
+            #if defined(HAVE_SDL3)
+            ltrig = SDL_GetJoystickAxis(sdl_joystick, 3);
+            rtrig = SDL_GetJoystickAxis(sdl_joystick, 4);
+            #else
             ltrig = SDL_JoystickGetAxis(sdl_joystick, 3);
             rtrig = SDL_JoystickGetAxis(sdl_joystick, 4);
+            #endif
         }
 
+        #if defined(HAVE_SDL3)
+        int button_count = SDL_GetNumJoystickButtons(sdl_joystick);
+        #else
         int button_count = SDL_JoystickNumButtons(sdl_joystick);
+        #endif
         for (int i = 0; i < button_count && i < MAX_JOYBUTTONS; ++i) {
+            #if defined(HAVE_SDL3)
+            update_button(i, SDL_GetJoystickButton(sdl_joystick, i));
+            #else
             update_button(i, SDL_JoystickGetButton(sdl_joystick, i));
+            #endif
         }
     }
 
@@ -324,12 +479,22 @@ static void controller_sdl_read(OSContPad *pad) {
 
 static void controller_sdl_rumble_play(f32 strength, f32 length) {
     if (sdl_haptic) {
+        #if defined(HAVE_SDL3)
+        SDL_PlayHapticRumble(sdl_haptic, strength, (u32)(length * 1000.0f));
+        #else
         SDL_HapticRumblePlay(sdl_haptic, strength, (u32)(length * 1000.0f));
+        #endif
     } else {
-#if SDL_VERSION_ATLEAST(2,0,18)
+#if defined(HAVE_SDL3) || SDL_VERSION_ATLEAST(2,0,18)
         uint16_t scaled_strength = strength * pow(2, 16) - 1;
-        if (SDL_GameControllerHasRumble(sdl_cntrl) == SDL_TRUE) {
-            SDL_GameControllerRumble(sdl_cntrl, scaled_strength, scaled_strength, (u32)(length * 1000.0f));
+        if (sdl_cntrl != NULL) {
+            #if defined(HAVE_SDL3)
+            SDL_RumbleGamepad(sdl_cntrl, scaled_strength, scaled_strength, (u32)(length * 1000.0f));
+            #else
+            if (SDL_GameControllerHasRumble(sdl_cntrl) == SDL_TRUE) {
+                SDL_GameControllerRumble(sdl_cntrl, scaled_strength, scaled_strength, (u32)(length * 1000.0f));
+            }
+            #endif
         }
 #endif
     }
@@ -337,11 +502,21 @@ static void controller_sdl_rumble_play(f32 strength, f32 length) {
 
 static void controller_sdl_rumble_stop(void) {
     if (sdl_haptic) {
+        #if defined(HAVE_SDL3)
+        SDL_StopHapticRumble(sdl_haptic);
+        #else
         SDL_HapticRumbleStop(sdl_haptic);
+        #endif
     } else {
-#if SDL_VERSION_ATLEAST(2,0,18)
-        if (SDL_GameControllerHasRumble(sdl_cntrl) == SDL_TRUE) {
-            SDL_GameControllerRumble(sdl_cntrl, 0, 0, 0);
+#if defined(HAVE_SDL3) || SDL_VERSION_ATLEAST(2,0,18)
+        if (sdl_cntrl != NULL) {
+            #if defined(HAVE_SDL3)
+            SDL_RumbleGamepad(sdl_cntrl, 0, 0, 0);
+            #else
+            if (SDL_GameControllerHasRumble(sdl_cntrl) == SDL_TRUE) {
+                SDL_GameControllerRumble(sdl_cntrl, 0, 0, 0);
+            }
+            #endif
         }
 #endif
     }
@@ -355,7 +530,7 @@ static u32 controller_sdl_rawkey(void) {
     }
 
     for (u32 i = 1; i < MAX_MOUSEBUTTONS; ++i) {
-        if (last_mouse & SDL_BUTTON(i)) {
+        if (last_mouse & SDL_BUTTON_MASK(i)) {
             const u32 ret = VK_OFS_SDL_MOUSE + i;
             last_mouse = 0;
             return ret;
@@ -365,20 +540,45 @@ static u32 controller_sdl_rawkey(void) {
 }
 
 static void controller_sdl_shutdown(void) {
+    #if defined(HAVE_SDL3)
+    if (SDL_WasInit(SDL_INIT_GAMEPAD)) {
+    #else
     if (SDL_WasInit(SDL_INIT_GAMECONTROLLER)) {
+    #endif
         if (sdl_cntrl) {
+            #if defined(HAVE_SDL3)
+            SDL_CloseGamepad(sdl_cntrl);
+            #else
             SDL_GameControllerClose(sdl_cntrl);
+            #endif
             sdl_cntrl = NULL;
         }
+        #if defined(HAVE_SDL3)
+        SDL_QuitSubSystem(SDL_INIT_GAMEPAD);
+        #else
         SDL_QuitSubSystem(SDL_INIT_GAMECONTROLLER);
+        #endif
     }
 
     if (SDL_WasInit(SDL_INIT_HAPTIC)) {
         if (sdl_haptic) {
+            #if defined(HAVE_SDL3)
+            SDL_CloseHaptic(sdl_haptic);
+            #else
             SDL_HapticClose(sdl_haptic);
+            #endif
             sdl_haptic = NULL;
         }
         SDL_QuitSubSystem(SDL_INIT_HAPTIC);
+    }
+
+    if (sdl_joystick) {
+        #if defined(HAVE_SDL3)
+        SDL_CloseJoystick(sdl_joystick);
+        #else
+        SDL_JoystickClose(sdl_joystick);
+        #endif
+        sdl_joystick = NULL;
     }
 
     haptics_enabled = false;
@@ -397,4 +597,4 @@ struct ControllerAPI controller_sdl = {
     controller_sdl_shutdown
 };
 
-#endif // CAPI_SDL2
+#endif

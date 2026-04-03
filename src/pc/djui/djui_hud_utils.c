@@ -792,7 +792,4 @@ bool djui_hud_is_pause_menu_created(void) {
 }
 
 void djui_open_pause_menu(void) {
-    if (!gDjuiPanelPauseCreated) {
-        djui_panel_pause_create(NULL);
-    }
 }

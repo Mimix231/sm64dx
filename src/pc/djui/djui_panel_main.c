@@ -32,6 +32,11 @@ static void djui_panel_main_continue_last(UNUSED struct DjuiBase* caller) {
 }
 
 void djui_panel_main_create(struct DjuiBase* caller) {
+    (void)caller;
+    gInteractableOverridePad = false;
+    gDjuiPanelMainCreated = false;
+    return;
+
     struct DjuiThreePanel* panel = djui_panel_menu_create(configExCoopTheme ? "\\#ff0800\\SM\\#1be700\\64\\#00b3ff\\EX\n\\#ffef00\\COOP" : "", false);
     {
         struct DjuiBase* body = djui_three_panel_get_body(panel);

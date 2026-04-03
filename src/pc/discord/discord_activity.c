@@ -1,6 +1,6 @@
 #include "discord.h"
+#include "game/sm64dx_ui.h"
 #include "pc/pc_main.h"
-#include "pc/djui/djui.h"
 #include "pc/mods/mods.h"
 #include "pc/debuglog.h"
 #include "pc/utils/misc.h"
@@ -80,7 +80,7 @@ void discord_activity_update(void) {
         sCurActivity.party.size.max_size = 1;
     }
 
-    if ((sCurActivity.party.size.current_size > 1 || configAmountOfPlayers == 1) && !gDjuiInMainMenu) {
+    if ((sCurActivity.party.size.current_size > 1 || configAmountOfPlayers == 1) && !sm64dx_ui_is_in_main_menu()) {
         strcpy(sCurActivity.state, "Playing!");
     } else if (gNetworkType == NT_SERVER) {
         strcpy(sCurActivity.state, "Waiting for players...");

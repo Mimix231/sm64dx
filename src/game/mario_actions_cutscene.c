@@ -3033,7 +3033,7 @@ static s32 act_credits_cutscene(struct MarioState *m) {
             m->actionState += 2;
         }
 
-        if (gCurrCreditsEntry != NULL && !gDjuiInMainMenu) {
+        if (gCurrCreditsEntry != NULL && !sm64dx_ui_is_in_main_menu()) {
             if (m->playerIndex == 0) {
                 s32 width = m->actionState * 640 / 100;
                 s32 height = m->actionState * 480 / 100;

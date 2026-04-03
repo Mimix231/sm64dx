@@ -1,9 +1,6 @@
 #include "djui.h"
 #include "djui_panel.h"
-#include "djui_panel_main.h"
-#include "djui_panel_language.h"
 #include "djui_panel_pause.h"
-#include "djui_panel_join_message.h"
 #include "djui_sm64dx.h"
 #include "djui_ctx_display.h"
 #include "djui_fps_display.h"
@@ -25,9 +22,9 @@ struct DjuiText* gDjuiPauseOptions = NULL;
 struct DjuiText* gDjuiModReload = NULL;
 static struct DjuiText* sDjuiLuaError = NULL;
 static u32 sDjuiLuaErrorTimeout = 0;
-bool gDjuiInMainMenu = true;
+bool gDjuiInMainMenu = false;
 bool gDjuiInPlayerMenu = false;
-bool gDjuiDisabled = false;
+bool gDjuiDisabled = true;
 bool gDjuiShuttingDown = false;
 bool gDjuiChangingTheme = false;
 static bool sDjuiInited = false;
@@ -131,20 +128,13 @@ void djui_init(void) {
 }
 
 void djui_init_late(void) {
-    djui_panel_main_create(NULL);
-    if (configLanguage[0] == '\0') {
-        gPanelLanguageOnStartup = true;
-        djui_panel_language_create(NULL);
-    }
-
-    // djui_panel_debug_create();
-    djui_cursor_create();
+    // LumaUI owns shipped frontend screens. DJUI stays dormant unless wired back in explicitly.
 }
 
 void djui_connect_menu_open(void) {
     djui_panel_shutdown();
-    gDjuiInMainMenu = true;
-    djui_panel_main_create(NULL);
+    gDjuiInMainMenu = false;
+    gDjuiInPlayerMenu = false;
 }
 
 void djui_lua_error(char* text, struct DjuiColor color) {

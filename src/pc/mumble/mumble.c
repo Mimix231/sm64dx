@@ -7,9 +7,9 @@
 #include "game/level_update.h"
 #include "game/camera.h"
 #include "game/area.h"
+#include "game/sm64dx_ui.h"
 
 #include "pc/configfile.h"
-#include "pc/djui/djui.h"
 
 #include <stdbool.h>
 
@@ -79,7 +79,7 @@ void mumble_update(void) {
 
 	lm->uiTick++;
 
-    if (gDjuiInMainMenu) {
+    if (sm64dx_ui_is_in_main_menu()) {
         mumble_update_menu();
         return;
     }

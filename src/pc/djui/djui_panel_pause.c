@@ -163,6 +163,11 @@ static void djui_panel_pause_build_context(char *titleBuffer, size_t titleSize,
 }
 
 void djui_panel_pause_create(struct DjuiBase* caller) {
+    (void)caller;
+    gInteractableOverridePad = false;
+    gDjuiPanelPauseCreated = false;
+    return;
+
     struct DjuiBase *defaultBase = NULL;
     struct Sm64dxSaveSummary summary = { 0 };
     struct DjuiThreePanel* panel = NULL;

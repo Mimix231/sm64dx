@@ -41,9 +41,6 @@
 #include "pc/cliopts.h"
 #include "pc/configfile.h"
 #include "pc/network/network.h"
-#include "pc/djui/djui.h"
-// used for getting gMainMenuSounds
-#include "pc/djui/djui_panel_menu_options.h"
 #include "pc/lua/smlua_hooks.h"
 #include "pc/mods/mods.h"
 #include "pc/nametags.h"
@@ -632,7 +629,7 @@ void warp_credits(void) {
 
     play_transition(WARP_TRANSITION_FADE_FROM_COLOR, 0x14, 0x00, 0x00, 0x00);
 
-    if ((gCurrCreditsEntry == NULL || gCurrCreditsEntry == sCreditsSequence) && !gDjuiInMainMenu) {
+    if ((gCurrCreditsEntry == NULL || gCurrCreditsEntry == sCreditsSequence) && !sm64dx_ui_is_in_main_menu()) {
         if (gCurrentArea) {
             set_background_music(gCurrentArea->musicParam, gCurrentArea->musicParam2, 0);
         }
@@ -898,12 +895,12 @@ s16 level_trigger_warp(struct MarioState *m, s32 warpOp) {
             case WARP_OP_DEMO_NEXT:
             case WARP_OP_DEMO_END: sDelayedWarpTimer = 20; // Must be one line to match on -O2
                 val04 = FALSE;
-                if (!gDjuiInMainMenu) {
+                if (!sm64dx_ui_is_in_main_menu()) {
                     sSourceWarpNodeId = WARP_NODE_F0;
                     gSavedCourseNum = COURSE_NONE;
                     play_transition(WARP_TRANSITION_FADE_INTO_STAR, 0x14, 0x00, 0x00, 0x00);
                 } else {
-                    stop_demo(NULL);
+                    stop_demo();
                 }
                 break;
 
@@ -1003,7 +1000,7 @@ s16 level_trigger_warp(struct MarioState *m, s32 warpOp) {
             case WARP_OP_CREDITS_NEXT:
                 if (gCurrCreditsEntry == NULL) { gCurrCreditsEntry = &sCreditsSequence[0]; }
                 if (gCurrCreditsEntry == &sCreditsSequence[0]) {
-                    sDelayedWarpTimer = gDjuiInMainMenu ? 1 : 60;
+                    sDelayedWarpTimer = sm64dx_ui_is_in_main_menu() ? 1 : 60;
                     play_transition(WARP_TRANSITION_FADE_INTO_COLOR, 0x3C, 0x00, 0x00, 0x00);
                 } else {
                     sDelayedWarpTimer = 20;
@@ -1054,7 +1051,7 @@ void initiate_delayed_warp(void) {
                     break;
 
                 case WARP_OP_DEMO_NEXT:
-                    if (!gDjuiInMainMenu) {
+                    if (!sm64dx_ui_is_in_main_menu()) {
                         warp_special(SPECIAL_WARP_GODDARD);
                     }
                     break;
@@ -1075,7 +1072,7 @@ void initiate_delayed_warp(void) {
 
                 case WARP_OP_CREDITS_NEXT:
                     if (gCurrCreditsEntry == NULL) { gCurrCreditsEntry = &sCreditsSequence[0]; }
-                    sound_banks_disable(SEQ_PLAYER_SFX, gDjuiInMainMenu ? SOUND_BANKS_ALL & ~(1 << SOUND_BANK_MENU) : SOUND_BANKS_ALL);
+                    sound_banks_disable(SEQ_PLAYER_SFX, sm64dx_ui_is_in_main_menu() ? SOUND_BANKS_ALL & ~(1 << SOUND_BANK_MENU) : SOUND_BANKS_ALL);
 
                     gCurrCreditsEntry += 1;
 
@@ -1083,7 +1080,7 @@ void initiate_delayed_warp(void) {
                         lvl_skip_credits();
                     } else if (gCurrCreditsEntry != NULL) {
                         gCurrActNum = gCurrCreditsEntry->unk02 & 0x07;
-                        if (gCurrCreditsEntry->levelNum == LEVEL_CASTLE_GROUNDS && gDjuiInMainMenu) {
+                        if (gCurrCreditsEntry->levelNum == LEVEL_CASTLE_GROUNDS && sm64dx_ui_is_in_main_menu()) {
                             gCurrCreditsEntry = &sCreditsSequence[1];
                             destWarpNode = WARP_NODE_CREDITS_NEXT;
                         } else if ((gCurrCreditsEntry + 1)->levelNum == LEVEL_NONE) {
@@ -1175,7 +1172,7 @@ void update_hud_values(void) {
         gHudDisplay.lives = gMarioState->numLives;
         gHudDisplay.keys = gMarioState->numKeys;
 
-        if (numHealthWedges > gHudDisplay.wedges && !gDjuiInMainMenu) {
+        if (numHealthWedges > gHudDisplay.wedges && !sm64dx_ui_is_in_main_menu()) {
             play_sound(SOUND_MENU_POWER_METER, gGlobalSoundSource);
         }
         gHudDisplay.wedges = numHealthWedges;
@@ -1253,13 +1250,13 @@ static void start_demo(void) {
     }
 }
 
-void stop_demo(UNUSED struct DjuiBase* caller) {
+void stop_demo(void) {
     if (gIsDemoActive) {
         gIsDemoActive = false;
         gCurrDemoInput = NULL;
         gChangeLevel = gCurrLevelNum;
         gDemoCountdown = 0;
-        if (gDjuiInMainMenu || gNetworkType == NT_NONE) {
+        if (sm64dx_ui_is_in_main_menu() || gNetworkType == NT_NONE) {
             update_menu_level();
         }
     }
@@ -1268,7 +1265,7 @@ void stop_demo(UNUSED struct DjuiBase* caller) {
 int gPressedStart = 0;
 
 s32 play_mode_normal(void) {
-    if (!gDjuiInMainMenu) {
+    if (!sm64dx_ui_is_in_main_menu()) {
         if (gCurrDemoInput != NULL) {
             print_intro_text();
             if (gPlayer1Controller->buttonPressed & END_DEMO) {
@@ -1279,11 +1276,11 @@ s32 play_mode_normal(void) {
             }
         }
     } else {
-        if (gDjuiInMainMenu &&
+        if (sm64dx_ui_is_in_main_menu() &&
             !configMenuStaffRoll &&
             gCurrDemoInput == NULL &&
             configMenuDemos &&
-            !gDjuiInPlayerMenu &&
+            !sm64dx_ui_is_in_player_menu() &&
             (++gDemoCountdown) == PRESS_START_DEMO_TIMER &&
             (find_demo_number() && (sDemoNumber <= 6 && sDemoNumber > -1)) &&
             gNetworkType == NT_NONE) {
@@ -1291,10 +1288,10 @@ s32 play_mode_normal(void) {
         }
 
         if (((gCurrDemoInput != NULL) &&
-            (gPlayer1Controller->buttonPressed & END_DEMO || !gIsDemoActive || !gDjuiInMainMenu || gNetworkType != NT_NONE || gDjuiInPlayerMenu)) ||
+            (gPlayer1Controller->buttonPressed & END_DEMO || !gIsDemoActive || !sm64dx_ui_is_in_main_menu() || gNetworkType != NT_NONE || sm64dx_ui_is_in_player_menu())) ||
             (gCurrDemoInput == NULL && gIsDemoActive)) {
             gPlayer1Controller->buttonPressed &= ~END_DEMO;
-            stop_demo(NULL);
+            stop_demo();
         }
     }
 
@@ -1524,7 +1521,8 @@ void update_menu_level(void) {
     stop_cap_music();
     reset_volume();
     disable_background_sound();
-    if (gMainMenuSounds[configMenuSound].sound == STAGE_MUSIC) {
+    const struct Sm64dxMainMenuSound *mainMenuSounds = sm64dx_ui_get_main_menu_sounds();
+    if (mainMenuSounds[configMenuSound].sound == SM64DX_UI_STAGE_MUSIC) {
         // if staff roll is on, set configMenuSound to Title Screen sequence, or 0
         if (configMenuStaffRoll) {
             configMenuSound = 0;
@@ -1535,7 +1533,7 @@ void update_menu_level(void) {
             set_background_music(gCurrentArea->musicParam, gCurrentArea->musicParam2, 0);
         }
     } else {
-        set_background_music(0, gMainMenuSounds[configMenuSound].sound, 0);
+        set_background_music(0, mainMenuSounds[configMenuSound].sound, 0);
     }
 
     if (configMenuStaffRoll) {
@@ -1547,7 +1545,7 @@ void update_menu_level(void) {
     // warp to level
     if (gCurrLevelNum != curLevel) {
         if (gIsDemoActive) {
-            stop_demo(NULL);
+            stop_demo();
         }
 
         gChangeLevel = curLevel;
@@ -1691,10 +1689,10 @@ void update_menu_level(void) {
 
 s32 update_level(void) {
     // update main menu level
-    if (gDjuiInMainMenu) {
+    if (sm64dx_ui_is_in_main_menu()) {
         update_menu_level();
     }
-    sCancelNextActSelector = gDjuiInMainMenu;
+    sCancelNextActSelector = sm64dx_ui_is_in_main_menu();
 
     if (gFanFareDebounce > 0) { gFanFareDebounce--; }
 
@@ -1807,7 +1805,7 @@ s32 init_level(void) {
             } else if (!gDebugLevelSelect) {
                 if (gMarioState && gMarioState->action != ACT_UNINITIALIZED) {
                     bool skipIntro = (gNetworkType == NT_NONE || gServerSettings.skipIntro != 0);
-                    if (gDjuiInMainMenu && gNetworkType == NT_NONE) {
+                    if (sm64dx_ui_is_in_main_menu() && gNetworkType == NT_NONE) {
                         // pick random main menu level
                         if (configMenuRandom) {
                             srand(time(0));
@@ -1828,7 +1826,7 @@ s32 init_level(void) {
                                 set_mario_action(gMarioState, ACT_IDLE, 0);
                             }
                         }
-                    } else if (skipIntro || save_file_exists(gCurrSaveFileNum - 1) || gDjuiInMainMenu) {
+                    } else if (skipIntro || save_file_exists(gCurrSaveFileNum - 1) || sm64dx_ui_is_in_main_menu()) {
                         set_mario_action(gMarioState, ACT_IDLE, 0);
                     } else {
                         set_mario_action(gMarioState, ACT_INTRO_CUTSCENE, 0);
@@ -1964,7 +1962,7 @@ s32 lvl_set_current_level(s16 param, s16 levelNum) {
         disable_warp_checkpoint();
     }
 
-    if (gDjuiInMainMenu) {
+    if (sm64dx_ui_is_in_main_menu()) {
         return 0;
     }
 

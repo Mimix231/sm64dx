@@ -20,8 +20,6 @@
 #include "segment2.h"
 #include "segment_symbols.h"
 #include "rng_position.h"
-#include "pc/djui/djui.h"
-#include "pc/djui/djui_panel_pause.h"
 #include "rumble_init.h"
 #include <prevent_bss_reordering.h>
 #include "bettercamera.h"
@@ -253,8 +251,7 @@ void end_master_display_list(void) {
         draw_profiler();
     }
 
-    extern void djui_render(void);
-    djui_render();
+    sm64dx_ui_render();
 
     gDPFullSync(gDisplayListHead++);
     gSPEndDisplayList(gDisplayListHead++);
@@ -463,7 +460,7 @@ void read_controller_inputs(void) {
     // controller information.
     if (gControllerBits) {
         osRecvMesg(&gSIEventMesgQueue, &D_80339BEC, OS_MESG_BLOCK);
-        osContGetReadData(gInteractableOverridePad ? &gInteractablePad : &gControllerPads[0]);
+        osContGetReadData(sm64dx_ui_uses_interactable_pad() ? sm64dx_ui_get_interactable_pad() : &gControllerPads[0]);
     }
     run_demo_inputs();
 

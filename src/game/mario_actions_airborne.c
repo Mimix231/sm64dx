@@ -74,7 +74,7 @@ s32 lava_boost_on_wall(struct MarioState *m) {
     if (!m) { return 0; }
     bool allowHazard = true;
     smlua_call_event_hooks(HOOK_ALLOW_HAZARD_SURFACE, m, HAZARD_TYPE_LAVA_WALL, &allowHazard);
-    if ((!allowHazard) || gDjuiInMainMenu) { return FALSE; }
+    if ((!allowHazard) || sm64dx_ui_is_in_main_menu()) { return FALSE; }
     m->faceAngle[1] = atan2s(m->wallNormal[2], m->wallNormal[0]);
 
     if (m->forwardVel < 24.0f) {

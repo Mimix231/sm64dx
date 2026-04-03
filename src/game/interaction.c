@@ -888,7 +888,7 @@ void reset_mario_pitch(struct MarioState *m) {
 
 u32 interact_coin(struct MarioState *m, UNUSED u32 interactType, struct Object *o) {
     if (!m || !o) { return FALSE; }
-    if (m != &gMarioStates[0] || (gDjuiInMainMenu && gCurrLevelNum == LEVEL_TTM)) {
+    if (m != &gMarioStates[0] || (sm64dx_ui_is_in_main_menu() && gCurrLevelNum == LEVEL_TTM)) {
         // only collect locally
         return FALSE;
     }
@@ -2511,7 +2511,7 @@ void pss_end_slide(struct MarioState *m) {
 
 void mario_handle_special_floors(struct MarioState *m) {
     if (!m) { return; }
-    if ((m->action & ACT_GROUP_MASK) == ACT_GROUP_CUTSCENE || gDjuiInMainMenu) {
+    if ((m->action & ACT_GROUP_MASK) == ACT_GROUP_CUTSCENE || sm64dx_ui_is_in_main_menu()) {
         return;
     }
 

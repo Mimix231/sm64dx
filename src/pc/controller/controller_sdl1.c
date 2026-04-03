@@ -25,8 +25,7 @@
 
 #include "game/level_update.h"
 #include "game/bettercamera.h"
-
-#include "pc/djui/djui.h"
+#include "game/sm64dx_ui.h"
 
 #define MAX_JOYBINDS 32
 #define MAX_MOUSEBUTTONS 8 // arbitrary
@@ -124,7 +123,7 @@ static void controller_sdl_init(void) {
                 joy_axis_binds[i] = -1;
     }
 
-    if (gNewCamera.isMouse && gMenuMode == -1 && !gDjuiChatBoxFocus && !gDjuiConsoleFocus) {
+    if (gNewCamera.isMouse && gMenuMode == -1 && !sm64dx_ui_is_chat_box_focused() && !sm64dx_ui_is_console_focused()) {
         controller_mouse_enter_relative();
     }
     controller_mouse_read_relative();
@@ -152,7 +151,7 @@ extern s16 gMenuMode;
 static void controller_sdl_read(OSContPad *pad) {
     if (!init_ok) return;
 
-    if (gNewCamera.isMouse && gMenuMode == -1 && !gDjuiChatBoxFocus && !gDjuiConsoleFocus) {
+    if (gNewCamera.isMouse && gMenuMode == -1 && !sm64dx_ui_is_chat_box_focused() && !sm64dx_ui_is_console_focused()) {
         controller_mouse_enter_relative();
     } else {
         controller_mouse_leave_relative();
@@ -162,7 +161,7 @@ static void controller_sdl_read(OSContPad *pad) {
     controller_mouse_read_relative();
     u32 mouse = mouse_buttons;
 
-    if (!gInteractableOverridePad) {
+    if (!sm64dx_ui_uses_interactable_pad()) {
         for (u32 i = 0; i < num_mouse_binds; ++i)
             if (mouse & SDL_BUTTON(mouse_binds[i][0]))
                 pad->button |= mouse_binds[i][1];

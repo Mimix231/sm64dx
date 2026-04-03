@@ -27,9 +27,6 @@
 #include "macros.h"
 #include "hardcoded.h"
 #include "pc/network/network.h"
-#include "pc/djui/djui.h"
-#include "pc/djui/djui_panel.h"
-#include "pc/djui/djui_panel_pause.h"
 #include "pc/utils/misc.h"
 #include "data/dynos_mgr_builtin_externs.h"
 #include "hud.h"
@@ -2988,13 +2985,13 @@ s16 render_pause_courses_and_castle(void) {
 
     if (!gPauseMenuHidden
         && (gDialogBoxState == DIALOG_STATE_VERTICAL || gDialogBoxState == DIALOG_STATE_HORIZONTAL)
-        && !gDjuiPanelPauseCreated) {
-        djui_panel_pause_create(NULL);
+        && !sm64dx_ui_pause_menu_is_created()) {
+        sm64dx_ui_pause_menu_create();
     }
 
-    if (gDjuiPanelPauseCreated && !gDjuiInPlayerMenu) { shade_screen(); }
+    if (sm64dx_ui_pause_menu_is_created() && !sm64dx_ui_is_in_player_menu()) { shade_screen(); }
 
-    num = djui_panel_pause_consume_result();
+    num = sm64dx_ui_pause_menu_consume_result();
     if (num != 0) {
         level_set_transition(0, NULL);
         play_sound(SOUND_MENU_PAUSE_2, gGlobalSoundSource);

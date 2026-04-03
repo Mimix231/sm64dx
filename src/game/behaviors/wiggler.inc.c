@@ -224,7 +224,7 @@ static void wiggler_act_walk(void) {
 
     // Update text if necessary
     if (o->oWigglerTextStatus < WIGGLER_TEXT_STATUS_COMPLETED_DIALOG) {
-        if (o->oWigglerTextStatus == WIGGLER_TEXT_STATUS_AWAIT_DIALOG && !gDjuiInMainMenu) {
+        if (o->oWigglerTextStatus == WIGGLER_TEXT_STATUS_AWAIT_DIALOG && !sm64dx_ui_is_in_main_menu()) {
             seq_player_lower_volume(SEQ_PLAYER_LEVEL, 60, 40);
             o->oWigglerTextStatus = WIGGLER_TEXT_STATUS_SHOWING_DIALOG;
         }

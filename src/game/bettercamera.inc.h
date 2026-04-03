@@ -74,8 +74,6 @@ NewCamera gNewCamera = {
     .LCentering             = true,
 };
 
-extern bool gDjuiInMainMenu;
-
 inline static s16 newcam_clamp(s16 value, s16 a, s16 b) {
     return min(max(a, value), b);
 }
@@ -175,11 +173,11 @@ void newcam_init_settings(void) {
     gNewCamera.LCentering   = camera_config_get_centering();
 
     // setup main menu camera
-    if (gDjuiInMainMenu) {
+    if (sm64dx_ui_is_in_main_menu()) {
         gNewCamera.tilt = 5;
     }
 
-    newcam_toggle(camera_config_is_free_cam_enabled() || gDjuiInMainMenu);
+    newcam_toggle(camera_config_is_free_cam_enabled() || sm64dx_ui_is_in_main_menu());
 }
 
 static void newcam_rotate_button(void) {
@@ -253,7 +251,7 @@ static void newcam_rotate_button(void) {
     }
 
     // Mouse control
-    if (gNewCamera.isMouse && !gDjuiInMainMenu && !gDjuiChatBoxFocus && !gDjuiConsoleFocus) {
+    if (gNewCamera.isMouse && !sm64dx_ui_is_in_main_menu() && !sm64dx_ui_is_chat_box_focused() && !sm64dx_ui_is_console_focused()) {
         if (!gNewCamera.useDPad || !gNewCamera.directionLocked) {
             gNewCamera.yaw += newcam_ivrt(0) * mouse_x * 16.f * (gNewCamera.sensitivityX / 250.f);
         }
@@ -295,7 +293,7 @@ static f32 newcam_get_distance_target() {
 }
 
 static void newcam_zoom_button(void) {
-    if (gDjuiInMainMenu) {
+    if (sm64dx_ui_is_in_main_menu()) {
         gNewCamera.distance = NEWCAM_DISTANCES[0];
         gNewCamera.distanceTargetIndex = 0;
         return;
@@ -501,7 +499,7 @@ static void newcam_collision(void) {
 }
 
 static void newcam_set_pan(void) {
-    if (gDjuiInMainMenu) {
+    if (sm64dx_ui_is_in_main_menu()) {
         gNewCamera.panX = 0;
         gNewCamera.panZ = 0;
         return;

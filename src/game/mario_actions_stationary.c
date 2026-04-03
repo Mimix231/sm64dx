@@ -134,12 +134,11 @@ s32 act_idle(struct MarioState *m) {
         return TRUE;
     }
 
-    extern bool gDjuiInMainMenu;
     if (m->actionState == 3) {
         if (m->area && ((m->area->terrainType & TERRAIN_MASK) == TERRAIN_SNOW)) {
             return set_mario_action(m, ACT_SHIVERING, 0);
         } else {
-            if (gDjuiInMainMenu || gDjuiInPlayerMenu) {
+            if (sm64dx_ui_is_in_main_menu() || sm64dx_ui_is_in_player_menu()) {
                 m->actionState = 0;
                 m->actionTimer = 0;
             } else {
@@ -216,7 +215,7 @@ s32 act_start_sleeping(struct MarioState *m) {
         return set_mario_action(m, ACT_IN_QUICKSAND, 0);
     }
 
-    if (m->playerIndex == 0 && gDjuiInPlayerMenu) {
+    if (m->playerIndex == 0 && sm64dx_ui_is_in_player_menu()) {
         return set_mario_action(m, ACT_IDLE, 0);
     }
 
@@ -300,7 +299,7 @@ s32 act_sleeping(struct MarioState *m) {
             return set_mario_action(m, ACT_WAKING_UP, m->actionState);
         }
 
-        if (gDjuiInPlayerMenu) {
+        if (sm64dx_ui_is_in_player_menu()) {
             return set_mario_action(m, ACT_WAKING_UP, m->actionState);
         }
     }

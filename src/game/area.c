@@ -25,8 +25,6 @@
 #include "game/ingame_menu.h"
 #include "pc/network/network.h"
 #include "pc/lua/smlua_hooks.h"
-#include "pc/djui/djui.h"
-#include "pc/djui/djui_panel_pause.h"
 #include "pc/nametags.h"
 #include "engine/lighting_engine.h"
 
@@ -453,22 +451,22 @@ void render_game(void) {
         gDPSetScissor(gDisplayListHead++, G_SC_NON_INTERLACE, 0, BORDER_HEIGHT, SCREEN_WIDTH,
                       SCREEN_HEIGHT - BORDER_HEIGHT);
 
-        if (!gDjuiDisabled) {
-            djui_reset_hud_params();
+        if (!sm64dx_ui_is_disabled()) {
+            sm64dx_ui_reset_hud_params();
             create_dl_ortho_matrix();
-            djui_gfx_displaylist_begin();
-            if (gServerSettings.nametags && !gDjuiInMainMenu) {
+            sm64dx_ui_gfx_displaylist_begin();
+            if (gServerSettings.nametags && !sm64dx_ui_is_in_main_menu()) {
                 nametags_render();
             }
-            smlua_call_event_hooks(HOOK_ON_HUD_RENDER_BEHIND, djui_reset_hud_params);
-            djui_gfx_displaylist_end();
+            smlua_call_event_hooks(HOOK_ON_HUD_RENDER_BEHIND, sm64dx_ui_reset_hud_params);
+            sm64dx_ui_gfx_displaylist_end();
         }
         render_hud();
 
         gDPSetScissor(gDisplayListHead++, G_SC_NON_INTERLACE, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
         render_text_labels();
         do_cutscene_handler();
-        if (!gDjuiInMainMenu) {
+        if (!sm64dx_ui_is_in_main_menu()) {
             print_displaying_credits_entry();
         }
         gDPSetScissor(gDisplayListHead++, G_SC_NON_INTERLACE, 0, BORDER_HEIGHT, SCREEN_WIDTH,

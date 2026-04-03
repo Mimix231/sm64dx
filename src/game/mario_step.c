@@ -123,8 +123,7 @@ void mario_bonk_reflection(struct MarioState *m, u8 negateSpeed) {
 
 u32 mario_update_quicksand(struct MarioState *m, f32 sinkingSpeed) {
     if (!m) { return 0; }
-    extern bool gDjuiInMainMenu;
-    if (m->action & ACT_FLAG_RIDING_SHELL || gDjuiInMainMenu) {
+    if (m->action & ACT_FLAG_RIDING_SHELL || sm64dx_ui_is_in_main_menu()) {
         m->quicksandDepth = 0.0f;
     } else {
         if (m->quicksandDepth < 1.1f) {
@@ -226,8 +225,7 @@ u32 mario_update_windy_ground(struct MarioState *m) {
     struct Surface *floor = m->floor;
     if (!floor) { return 0; }
     
-    extern bool gDjuiInMainMenu;
-    if (floor->type == SURFACE_HORIZONTAL_WIND && !gDjuiInMainMenu) {
+    if (floor->type == SURFACE_HORIZONTAL_WIND && !sm64dx_ui_is_in_main_menu()) {
         bool allowHazard = true;
         smlua_call_event_hooks(HOOK_ALLOW_HAZARD_SURFACE, m, HAZARD_TYPE_HORIZONTAL_WIND, &allowHazard);
         if (!allowHazard) {

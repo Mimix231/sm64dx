@@ -81,12 +81,12 @@ NO_LDIV ?= 0
 
 # Renderers: GL, GL_LEGACY, D3D11, DUMMY
 RENDER_API ?= GL
-# Window managers: SDL1, SDL2, DXGI (forced if RENDER_API is D3D11), DUMMY (forced if RENDER_API is DUMMY)
-WINDOW_API ?= SDL2
-# Audio backends: SDL1, SDL2, DUMMY
-AUDIO_API ?= SDL2
-# Controller backends (can have multiple, space separated): SDL2, SDL1
-CONTROLLER_API ?= SDL2
+# Window managers: SDL1, SDL2, SDL3, DXGI (forced if RENDER_API is D3D11), DUMMY (forced if RENDER_API is DUMMY)
+WINDOW_API ?= SDL3
+# Audio backends: SDL1, SDL2, SDL3, DUMMY
+AUDIO_API ?= SDL3
+# Controller backends (can have multiple, space separated): SDL3, SDL2, SDL1
+CONTROLLER_API ?= SDL3
 
 # Automatic settings for PC port(s)
 
@@ -517,7 +517,7 @@ SRC_DIRS := src src/engine src/game src/audio src/menu src/buffers actors levels
 BIN_DIRS := bin bin/$(VERSION)
 
 # PC files
-SRC_DIRS += src/pc src/pc/gfx src/pc/audio src/pc/controller src/pc/fs src/pc/fs/packtypes src/pc/mods src/pc/dev src/pc/network src/pc/network/packets src/pc/network/socket src/pc/network/coopnet src/pc/utils src/pc/utils/miniz src/pc/djui src/pc/lua src/pc/lua/utils src/pc/os
+SRC_DIRS += src/pc src/pc/gfx src/pc/audio src/pc/controller src/pc/fs src/pc/fs/packtypes src/pc/mods src/pc/dev src/pc/network src/pc/network/packets src/pc/network/socket src/pc/network/coopnet src/pc/utils src/pc/utils/miniz src/pc/djui src/pc/lua src/pc/lua/utils src/pc/os src/pc/lumaui
 
 ifeq ($(DISCORD_SDK),1)
   SRC_DIRS += src/pc/discord
@@ -760,7 +760,7 @@ endif
 
 # Connfigure backend flags
 
-SDLCONFIG := $(CROSS)sdl2-config
+SDLCONFIG :=
 
 BACKEND_CFLAGS := -DRAPI_$(RENDER_API)=1 -DWAPI_$(WINDOW_API)=1 -DAAPI_$(AUDIO_API)=1
 # can have multiple controller APIs
@@ -769,6 +769,7 @@ BACKEND_LDFLAG0S :=
 
 SDL1_USED := 0
 SDL2_USED := 0
+SDL3_USED := 0
 
 # for now, it's either SDL+GL or DXGI+DirectX, so choose based on WAPI
 ifeq ($(WINDOW_API),DXGI)
@@ -800,17 +801,24 @@ ifneq (,$(findstring SDL2,$(AUDIO_API)$(WINDOW_API)$(CONTROLLER_API)))
   SDL2_USED := 1
 endif
 
+ifneq (,$(findstring SDL3,$(AUDIO_API)$(WINDOW_API)$(CONTROLLER_API)))
+  SDL3_USED := 1
+endif
+
 ifneq (,$(findstring SDL1,$(AUDIO_API)$(WINDOW_API)$(CONTROLLER_API)))
   SDL1_USED := 1
 endif
 
-ifeq ($(SDL1_USED)$(SDL2_USED),11)
-  $(error Cannot link both SDL1 and SDL2 at the same time)
+SDL_USED_COUNT := $(words $(filter 1,$(SDL1_USED) $(SDL2_USED) $(SDL3_USED)))
+ifneq ($(filter 2 3,$(SDL_USED_COUNT)),)
+  $(error Cannot link multiple SDL major versions at the same time)
 endif
 
 # SDL can be used by different systems, so we consolidate all of that shit into this
 
-ifeq ($(SDL2_USED),1)
+ifeq ($(SDL3_USED),1)
+  BACKEND_CFLAGS += -DHAVE_SDL3=1
+else ifeq ($(SDL2_USED),1)
   SDLCONFIG := $(CROSS)sdl2-config
   BACKEND_CFLAGS += -DHAVE_SDL2=1
 else ifeq ($(SDL1_USED),1)
@@ -831,6 +839,19 @@ ifneq ($(SDL1_USED)$(SDL2_USED),00)
     BACKEND_LDFLAGS += `$(SDLCONFIG) --static-libs` -lsetupapi -luser32 -limm32 -lole32 -loleaut32 -lshell32 -lshlwapi -lwinmm -lversion
   else
     BACKEND_LDFLAGS += `$(SDLCONFIG) --libs`
+  endif
+endif
+
+ifeq ($(SDL3_USED),1)
+  ifeq ($(OSX_BUILD),1)
+    BACKEND_CFLAGS += -I$(BREW_PREFIX)/include
+    BACKEND_LDFLAGS += -L$(BREW_PREFIX)/lib -lSDL3
+  else
+    BACKEND_LDFLAGS += -lSDL3
+  endif
+
+  ifeq ($(WINDOWS_BUILD),1)
+    BACKEND_LDFLAGS += -lgdi32 -lsetupapi -luser32 -limm32 -lole32 -loleaut32 -lshell32 -lshlwapi -lwinmm -lversion -luuid
   endif
 endif
 

@@ -21,7 +21,14 @@
 
 #define GL_GLEXT_PROTOTYPES 1
 
-#ifdef WAPI_SDL2
+#ifdef WAPI_SDL3
+# include <SDL3/SDL.h>
+# ifdef USE_GLES
+#  include <SDL3/SDL_opengles2.h>
+# else
+#  include <SDL3/SDL_opengl.h>
+# endif
+#elif defined(WAPI_SDL2)
 # include <SDL2/SDL.h>
 # ifdef USE_GLES
 #  include <SDL2/SDL_opengles2.h>

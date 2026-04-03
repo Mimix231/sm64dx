@@ -12,8 +12,6 @@
 #include "pc/pc_main.h"
 #include "engine/math_util.h"
 #include "menu/file_select.h"
-#include "pc/djui/djui.h"
-#include "pc/djui/djui_panel_pause.h"
 
 static int keyboard_buttons_down;
 
@@ -34,14 +32,6 @@ static int keyboard_map_scancode(int scancode) {
 }
 
 bool keyboard_on_key_down(int scancode) {
-    djui_panel_pause_disconnect_key_update(scancode);
-
-    // see if interactable captures this scancode
-    if (djui_interactable_on_key_down(scancode)) {
-        keyboard_lastkey = scancode;
-        return FALSE;
-    }
-
     int mapped = keyboard_map_scancode(scancode);
     keyboard_buttons_down |= mapped;
     keyboard_lastkey = scancode;
@@ -49,7 +39,6 @@ bool keyboard_on_key_down(int scancode) {
 }
 
 bool keyboard_on_key_up(int scancode) {
-    djui_interactable_on_key_up(scancode);
 
     int mapped = keyboard_map_scancode(scancode);
     keyboard_buttons_down &= ~mapped;
@@ -63,11 +52,12 @@ void keyboard_on_all_keys_up(void) {
 }
 
 void keyboard_on_text_input(char* text) {
-    djui_interactable_on_text_input(text);
+    (void)text;
 }
 
 void keyboard_on_text_editing(char* text, int cursorPos) {
-    djui_interactable_on_text_editing(text, cursorPos);
+    (void)text;
+    (void)cursorPos;
 }
 
 static void keyboard_add_binds(int mask, unsigned int *scancode) {

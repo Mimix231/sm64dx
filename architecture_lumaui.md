@@ -10,6 +10,7 @@ Rule: If future UI work conflicts with this document, either update this documen
 Related design specs:
 
 - [SM64DX Fresh Start Architecture](/G:/AIExperiments/sm64dx/architecture.md)
+- [LumaUI Phase Spec](/G:/AIExperiments/sm64dx/lumaui_spec.md)
 - [MoonOS And Pause Screen Product Spec](/G:/AIExperiments/sm64dx/docs/moonos-product-spec.md)
 
 ## 1. Decision
@@ -94,7 +95,7 @@ That means:
 
 Core shipped-game libraries:
 
-- `SDL2` for input plumbing, controller state, text input, window events, and platform events
+- `SDL3` for input plumbing, controller state, text input, window events, and platform events
 - `FreeType` for proper font rasterization, glyph metrics, and higher-quality typography
 - `HarfBuzz` for text shaping and better international text support on top of `FreeType`
 - `stb_image` for UI textures, thumbnails, preview art, and pack icons

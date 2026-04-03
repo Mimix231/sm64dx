@@ -28,7 +28,6 @@
 #include "level_table.h"
 #include "pc/lua/utils/smlua_model_utils.h"
 #include "pc/lua/smlua.h"
-#include "pc/djui/djui.h"
 #include "pc/debug_context.h"
 #include "game/hardcoded.h"
 #include "menu/intro_geo.h"
@@ -411,7 +410,6 @@ static void level_cmd_free_level_pool(void) {
         gMarioStates[i].ceil = NULL;
         gMarioStates[i].floor = NULL;
     }
-
 
     if (!sFinishedLoadingPerm) {
         sFinishedLoadingPerm = true;
@@ -809,7 +807,7 @@ static void level_cmd_nop(void) {
 }
 
 static void level_cmd_show_dialog(void) {
-    if (sCurrAreaIndex != -1 && !gDjuiInMainMenu) {
+    if (sCurrAreaIndex != -1 && !sm64dx_ui_is_in_main_menu()) {
         if (CMD_GET(u8, 2) < 2) {
             gAreas[sCurrAreaIndex].dialog[CMD_GET(u8, 2)] = CMD_GET(u8, 3);
         }
@@ -1035,7 +1033,7 @@ static void level_cmd_jump_area_ext(void) {
 }
 
 static void level_cmd_show_dialog_ext(void) {
-    if (sCurrAreaIndex != -1 && !gDjuiInMainMenu) {
+    if (sCurrAreaIndex != -1 && !sm64dx_ui_is_in_main_menu()) {
         u8 luaParams = CMD_GET(u8, 2);
 
         get_lua_param(index, u8, SHOW_DIALOG_EXT_LUA_INDEX);

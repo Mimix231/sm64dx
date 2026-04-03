@@ -13,7 +13,6 @@
 #include "game/object_list_processor.h"
 #include "game/mario_misc.h"
 #include "pc/configfile.h"
-#include "pc/djui/djui.h"
 #include "pc/djui/djui_language.h"
 #include "pc/debuglog.h"
 #include "src/game/hardcoded.h"
@@ -221,7 +220,7 @@ static void write_packet_data(struct PacketPlayerData* data, struct MarioState* 
 
 void network_send_player(u8 localIndex) {
     if (gMarioStates[localIndex].marioObj == NULL) { return; }
-    if (gDjuiInMainMenu) { return; }
+    if (sm64dx_ui_is_in_main_menu()) { return; }
     if (gNetworkPlayerLocal == NULL || !gNetworkPlayerLocal->currAreaSyncValid) { return; }
 
     struct PacketPlayerData data = { 0 };

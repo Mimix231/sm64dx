@@ -1,6 +1,6 @@
 #include "controller_mouse.h"
 #include "pc/gfx/gfx_pc.h"
-#include "pc/djui/djui.h"
+#include "game/game_init.h"
 
 #ifdef WAPI_DXGI
 #define WIN32_LEAN_AND_MEAN
@@ -9,6 +9,8 @@ extern HWND gfx_dxgi_get_h_wnd(void);
 static bool mouse_relative_prev_cursor_state;
 #elif defined(CAPI_SDL1)
 #include <SDL/SDL.h>
+#elif defined(CAPI_SDL3)
+#include <SDL3/SDL.h>
 #elif defined(CAPI_SDL2)
 #include <SDL2/SDL.h>
 #endif
@@ -79,6 +81,13 @@ void controller_mouse_read_window(void) {
         mouse_window_x = p.x - gfx_current_dimensions.x_adjust_4by3;
         mouse_window_y = p.y;
     }
+#elif defined(CAPI_SDL3)
+    float mouseX = 0.0f;
+    float mouseY = 0.0f;
+    mouse_window_buttons = SDL_GetMouseState(&mouseX, &mouseY);
+    mouse_window_x = (s32) mouseX;
+    mouse_window_y = (s32) mouseY;
+    mouse_window_x -= gfx_current_dimensions.x_adjust_4by3;
 #elif defined(CAPI_SDL1) || defined(CAPI_SDL2)
     mouse_window_buttons = SDL_GetMouseState(&mouse_window_x, &mouse_window_y);
     mouse_window_x -= gfx_current_dimensions.x_adjust_4by3;
@@ -113,6 +122,12 @@ void controller_mouse_read_relative(void) {
         mouse_y = 0;
     }
 
+#elif defined(CAPI_SDL3)
+    float mouseX = 0.0f;
+    float mouseY = 0.0f;
+    mouse_buttons = SDL_GetRelativeMouseState(&mouseX, &mouseY);
+    mouse_x = (s32) mouseX;
+    mouse_y = (s32) mouseY;
 #elif defined(CAPI_SDL1) || defined(CAPI_SDL2)
     mouse_buttons = SDL_GetRelativeMouseState(&mouse_x, &mouse_y);
 #endif
@@ -134,6 +149,11 @@ void controller_mouse_enter_relative(void) {
         ShowCursor(FALSE);
 #elif defined(CAPI_SDL1)
         SDL_WM_GrabInput(SDL_GRAB_ON);
+#elif defined(CAPI_SDL3)
+        SDL_Window *window = SDL_GL_GetCurrentWindow();
+        if (window != NULL) {
+            SDL_SetWindowRelativeMouseMode(window, true);
+        }
 #elif defined(CAPI_SDL2)
         SDL_SetRelativeMouseMode(SDL_TRUE);
 #endif
@@ -148,6 +168,11 @@ void controller_mouse_leave_relative(void) {
         ShowCursor(mouse_relative_prev_cursor_state);
 #elif defined(CAPI_SDL1)
         SDL_WM_GrabInput(SDL_GRAB_OFF);
+#elif defined(CAPI_SDL3)
+        SDL_Window *window = SDL_GL_GetCurrentWindow();
+        if (window != NULL) {
+            SDL_SetWindowRelativeMouseMode(window, false);
+        }
 #elif defined(CAPI_SDL2)
         SDL_SetRelativeMouseMode(SDL_FALSE);
 #endif
@@ -155,7 +180,6 @@ void controller_mouse_leave_relative(void) {
 }
 
 void mouse_on_scroll(float x, float y) {
-    djui_interactable_on_scroll(x, y);
     mouse_scroll_timestamp = gGlobalTimer;
     mouse_scroll_x += x;
     mouse_scroll_y += y;

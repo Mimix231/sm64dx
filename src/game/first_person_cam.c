@@ -13,8 +13,6 @@
 #include "engine/math_util.h"
 
 #include "pc/controller/controller_mouse.h"
-#include "pc/djui/djui.h"
-#include "pc/djui/djui_hud_utils.h"
 #include "pc/lua/utils/smlua_camera_utils.h"
 #include "pc/lua/smlua_hooks.h"
 
@@ -154,7 +152,7 @@ static void first_person_camera_update(void) {
 }
 
 void first_person_update(void) {
-    if (gFirstPersonCamera.enabled && !gDjuiInMainMenu) {
+    if (gFirstPersonCamera.enabled && !sm64dx_ui_is_in_main_menu()) {
         struct MarioState *m = &gMarioStates[0];
 
         // check cancels

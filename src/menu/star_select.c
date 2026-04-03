@@ -478,7 +478,7 @@ s32 lvl_update_obj_and_load_act_button_actions(UNUSED s32 arg, UNUSED s32 unused
     }
 
     // Cancel the act selector while on the main menu
-    if (gDjuiInMainMenu) { return 1; }
+    if (sm64dx_ui_is_in_main_menu()) { return 1; }
 
     area_update_objects();
     sActSelectorMenuTimer++;

@@ -16,6 +16,7 @@
 #include "game/level_update.h"
 #include "game/player_palette.h"
 #include "game/save_file.h"
+#include "game/sm64dx_ui.h"
 #include "pc/configfile.h"
 #include "pc/fs/fs.h"
 #include "pc/ini.h"
@@ -1283,7 +1284,7 @@ void sm64dx_profile_update(void) {
         delta = 0.0;
     }
 
-    if (!gDjuiInMainMenu && gCurrSaveFileNum >= 1 && gCurrSaveFileNum <= NUM_SAVE_FILES) {
+    if (!sm64dx_ui_is_in_main_menu() && gCurrSaveFileNum >= 1 && gCurrSaveFileNum <= NUM_SAVE_FILES) {
         int slotIndex = gCurrSaveFileNum - 1;
         sSm64dx.playFractions[slotIndex] += delta;
         while (sSm64dx.playFractions[slotIndex] >= 1.0) {
@@ -1545,7 +1546,7 @@ void sm64dx_start_save_slot(int slot, bool playSound) {
         return;
     }
 
-    stop_demo(NULL);
+    stop_demo();
     configHostSaveSlot = slot;
     sm64dx_apply_save_setup(slot);
     sSm64dx.lastSaveSlot = slot;

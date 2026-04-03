@@ -25,7 +25,6 @@
 #include "pc/lua/utils/smlua_obj_utils.h"
 #include "data/dynos_mgr_builtin_externs.h"
 
-extern bool gDjuiInMainMenu;
 u8 gOverrideHideHud;
 
 /* @file hud.c
@@ -623,7 +622,7 @@ void render_hud(void) {
         create_dl_ortho_matrix();
 #endif
 
-        bool showHud = (!gDjuiInMainMenu && !gOverrideHideHud);
+        bool showHud = (!sm64dx_ui_is_in_main_menu() && !gOverrideHideHud);
 
         if (gCurrentArea != NULL && gCurrentArea->camera != NULL && gCurrentArea->camera->mode == CAMERA_MODE_INSIDE_CANNON) {
             render_hud_cannon_reticle();

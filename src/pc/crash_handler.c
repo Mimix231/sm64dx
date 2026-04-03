@@ -5,7 +5,9 @@ char gLastRemoteBhv[256] = "";
 
 #if (defined(_WIN32) || defined(__linux__)) && !defined(WAPI_DUMMY)
 
-#ifdef HAVE_SDL2
+#ifdef HAVE_SDL3
+#include <SDL3/SDL.h>
+#elif defined(HAVE_SDL2)
 #include <SDL2/SDL.h>
 #endif
 
@@ -638,19 +640,37 @@ static void crash_handler(const int signalNum, siginfo_t *info, UNUSED ucontext_
     crash_handler_add_info_str(&pText, 8, 208, "RemoteBhv", gLastRemoteBhv);
 
     // sounds
-#ifdef HAVE_SDL2
+#if defined(HAVE_SDL3) || defined(HAVE_SDL2)
+    #if defined(HAVE_SDL3)
+    if (SDL_WasInit(SDL_INIT_AUDIO) || SDL_InitSubSystem(SDL_INIT_AUDIO)) {
+    #else
     if (SDL_WasInit(SDL_INIT_AUDIO) || SDL_InitSubSystem(SDL_INIT_AUDIO) == 0) {
-        SDL_AudioSpec want, have;
+    #endif
+        SDL_AudioSpec want;
         want.freq = 32000;
+        #if defined(HAVE_SDL3)
+        want.format = SDL_AUDIO_S16;
+        #else
         want.format = AUDIO_S16SYS;
+        #endif
         want.channels = 1;
+        #if !defined(HAVE_SDL3)
         want.samples = 0x200;
+        #endif
+        #if defined(HAVE_SDL3)
+        SDL_AudioStream *stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &want, NULL, NULL);
+        if (stream != NULL) {
+            SDL_ResumeAudioDevice(SDL_GetAudioStreamDevice(stream));
+        }
+        #else
+        SDL_AudioSpec have;
         want.callback = NULL;
         want.userdata = NULL;
         s32 device = SDL_OpenAudioDevice(NULL, 0, &want, &have, 0);
         if (device) {
             SDL_PauseAudioDevice(device, 0);
         }
+        #endif
     }
 #endif
 

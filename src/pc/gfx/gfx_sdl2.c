@@ -1,4 +1,4 @@
-#ifdef WAPI_SDL2
+#if defined(WAPI_SDL3) || defined(WAPI_SDL2)
 
 #ifdef __MINGW32__
 #define FOR_WINDOWS 1
@@ -13,17 +13,37 @@
 #if FOR_WINDOWS
 #define GLEW_STATIC
 #include <GL/glew.h>
-#include <SDL2/SDL.h>
-#define GL_GLEXT_PROTOTYPES 1
-#include <SDL2/SDL_opengl.h>
+#if defined(HAVE_SDL3)
+#include <SDL3/SDL.h>
 #else
 #include <SDL2/SDL.h>
+#endif
+#define GL_GLEXT_PROTOTYPES 1
+#if defined(HAVE_SDL3)
+#include <SDL3/SDL_opengl.h>
+#else
+#include <SDL2/SDL_opengl.h>
+#endif
+#else
+#if defined(HAVE_SDL3)
+#include <SDL3/SDL.h>
+#else
+#include <SDL2/SDL.h>
+#endif
 #define GL_GLEXT_PROTOTYPES 1
 
 #ifdef OSX_BUILD
+#if defined(HAVE_SDL3)
+#include <SDL3/SDL_opengl.h>
+#else
 #include <SDL2/SDL_opengl.h>
+#endif
+#else
+#if defined(HAVE_SDL3)
+#include <SDL3/SDL_opengles2.h>
 #else
 #include <SDL2/SDL_opengles2.h>
+#endif
 #endif
 
 #endif // End of OS-Specific GL defines
@@ -67,7 +87,23 @@ static void (*kb_text_editing)(char*, int) = NULL;
 
 static void (*m_scroll)(float, float) = NULL;
 
+#if defined(HAVE_SDL3)
+#define IS_FULLSCREEN() ((SDL_GetWindowFlags(wnd) & SDL_WINDOW_FULLSCREEN) != 0)
+#else
 #define IS_FULLSCREEN() ((SDL_GetWindowFlags(wnd) & SDL_WINDOW_FULLSCREEN_DESKTOP) != 0)
+#endif
+
+static inline void gfx_sdl_set_cursor_state(const bool visible) {
+#if defined(HAVE_SDL3)
+    if (visible) {
+        SDL_ShowCursor();
+    } else {
+        SDL_HideCursor();
+    }
+#else
+    SDL_ShowCursor(visible ? SDL_ENABLE : SDL_DISABLE);
+#endif
+}
 
 static inline void gfx_sdl_set_vsync(const bool enabled) {
     SDL_GL_SetSwapInterval(enabled);
@@ -79,10 +115,18 @@ static void gfx_sdl_set_fullscreen(void) {
     if (configWindow.fullscreen == IS_FULLSCREEN())
         return;
     if (configWindow.fullscreen) {
+#if defined(HAVE_SDL3)
+        SDL_SetWindowFullscreen(wnd, true);
+#else
         SDL_SetWindowFullscreen(wnd, SDL_WINDOW_FULLSCREEN_DESKTOP);
+#endif
     } else {
+#if defined(HAVE_SDL3)
+        SDL_SetWindowFullscreen(wnd, false);
+#else
         SDL_SetWindowFullscreen(wnd, 0);
-        SDL_ShowCursor(1);
+#endif
+        gfx_sdl_set_cursor_state(true);
         configWindow.exiting_fullscreen = true;
     }
 }
@@ -90,7 +134,7 @@ static void gfx_sdl_set_fullscreen(void) {
 static void gfx_sdl_reset_dimension_and_pos(void) {
     if (configWindow.exiting_fullscreen) {
         configWindow.exiting_fullscreen = false;
-        SDL_ShowCursor(0);
+        gfx_sdl_set_cursor_state(false);
     }
 
     if (configWindow.reset) {
@@ -118,8 +162,13 @@ static void gfx_sdl_init(const char *window_title) {
 #endif
 
     SDL_SetHint(SDL_HINT_VIDEO_X11_NET_WM_BYPASS_COMPOSITOR, "0");
-    SDL_Init(SDL_INIT_VIDEO);
-    SDL_StartTextInput();
+    #if defined(HAVE_SDL3)
+    if (!SDL_Init(SDL_INIT_VIDEO)) {
+    #else
+    if (SDL_Init(SDL_INIT_VIDEO) != 0) {
+    #endif
+        sys_fatal("SDL video init failed: %s", SDL_GetError());
+    }
 
     if (configWindow.msaa > 0) {
         SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
@@ -140,18 +189,35 @@ static void gfx_sdl_init(const char *window_title) {
     int xpos = (configWindow.x == WAPI_WIN_CENTERPOS) ? SDL_WINDOWPOS_CENTERED : configWindow.x;
     int ypos = (configWindow.y == WAPI_WIN_CENTERPOS) ? SDL_WINDOWPOS_CENTERED : configWindow.y;
 
+    #if defined(HAVE_SDL3)
+    wnd = SDL_CreateWindow(window_title, configWindow.w, configWindow.h,
+        SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
+    #else
     wnd = SDL_CreateWindow(
         window_title,
         xpos, ypos, configWindow.w, configWindow.h,
         SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE
     );
+    #endif
+    if (wnd == NULL) {
+        sys_fatal("SDL window creation failed: %s", SDL_GetError());
+    }
+    #if defined(HAVE_SDL3)
+    SDL_SetWindowPosition(wnd, xpos, ypos);
+    SDL_StartTextInput(wnd);
+    #else
+    SDL_StartTextInput();
+    #endif
     ctx = SDL_GL_CreateContext(wnd);
+    if (ctx == NULL) {
+        sys_fatal("SDL GL context creation failed: %s", SDL_GetError());
+    }
 
     gfx_sdl_set_vsync(configWindow.vsync);
 
     gfx_sdl_set_fullscreen();
     if (configWindow.fullscreen) {
-        SDL_ShowCursor(SDL_DISABLE);
+        gfx_sdl_set_cursor_state(false);
     }
 
     controller_bind_init();
@@ -169,7 +235,7 @@ static void gfx_sdl_get_dimensions(uint32_t *width, uint32_t *height) {
 }
 
 static void gfx_sdl_onkeydown(int scancode) {
-    const Uint8 *state = SDL_GetKeyboardState(NULL);
+    const bool *state = SDL_GetKeyboardState(NULL);
 
     if ((state[SDL_SCANCODE_LALT] || state[SDL_SCANCODE_RALT]) && state[SDL_SCANCODE_RETURN]) {
         configWindow.fullscreen = !configWindow.fullscreen;
@@ -222,11 +288,50 @@ static void gfx_sdl_handle_events(void) {
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
         switch (event.type) {
+            #if defined(HAVE_SDL3)
+            case SDL_EVENT_TEXT_INPUT:
+                if (kb_text_input) { kb_text_input((char *) event.text.text); }
+                break;
+            case SDL_EVENT_TEXT_EDITING:
+                if (kb_text_editing) { kb_text_editing((char *) event.edit.text, event.edit.start); }
+                break;
+            case SDL_EVENT_KEY_DOWN:
+                gfx_sdl_onkeydown(event.key.scancode);
+                break;
+            case SDL_EVENT_KEY_UP:
+                gfx_sdl_onkeyup(event.key.scancode);
+                break;
+            case SDL_EVENT_MOUSE_WHEEL:
+                gfx_sdl_onscroll(event.wheel.x, event.wheel.y);
+                break;
+            case SDL_EVENT_WINDOW_MOVED:
+                if (!IS_FULLSCREEN()) {
+                    if (!configWindow.exiting_fullscreen) {
+                        if (event.window.data1 >= 0) configWindow.x = event.window.data1;
+                        if (event.window.data2 >= 0) configWindow.y = event.window.data2;
+                    }
+                }
+                break;
+            case SDL_EVENT_WINDOW_RESIZED:
+                if (!IS_FULLSCREEN()) {
+                    configWindow.w = event.window.data1;
+                    configWindow.h = event.window.data2;
+                }
+                break;
+            case SDL_EVENT_DROP_FILE:
+                if (event.drop.data != NULL) {
+                    gfx_sdl_ondropfile((char *) event.drop.data);
+                }
+                break;
+            case SDL_EVENT_QUIT:
+                game_exit();
+                break;
+            #else
             case SDL_TEXTINPUT:
-                kb_text_input(event.text.text);
+                if (kb_text_input) { kb_text_input(event.text.text); }
                 break;
             case SDL_TEXTEDITING: //IME composition
-                kb_text_editing(event.edit.text,event.edit.start);
+                if (kb_text_editing) { kb_text_editing(event.edit.text, event.edit.start); }
                 break;
             case SDL_KEYDOWN:
                 gfx_sdl_onkeydown(event.key.keysym.scancode);
@@ -259,6 +364,7 @@ static void gfx_sdl_handle_events(void) {
             case SDL_QUIT:
                 game_exit();
                 break;
+            #endif
         }
     }
 
@@ -319,7 +425,14 @@ static void gfx_sdl_reset_window_title(void) {
 
 static void gfx_sdl_shutdown(void) {
     if (SDL_WasInit(0)) {
-        if (ctx) { SDL_GL_DeleteContext(ctx); ctx = NULL; }
+        if (ctx) {
+            #if defined(HAVE_SDL3)
+            SDL_GL_DestroyContext(ctx);
+            #else
+            SDL_GL_DeleteContext(ctx);
+            #endif
+            ctx = NULL;
+        }
         if (wnd) { SDL_DestroyWindow(wnd); wnd = NULL; }
         SDL_Quit();
     }
@@ -329,8 +442,13 @@ static bool gfx_sdl_has_focus(void) {
     return (SDL_GetWindowFlags(wnd) & SDL_WINDOW_INPUT_FOCUS);
 }
 
+#if defined(HAVE_SDL3)
+static void gfx_sdl_start_text_input(void) { SDL_StartTextInput(wnd); }
+static void gfx_sdl_stop_text_input(void) { SDL_StopTextInput(wnd); }
+#else
 static void gfx_sdl_start_text_input(void) { SDL_StartTextInput(); }
 static void gfx_sdl_stop_text_input(void) { SDL_StopTextInput(); }
+#endif
 
 static char* gfx_sdl_get_clipboard_text(void) {
     static char clipboard_buf[WAPI_CLIPBOARD_BUFSIZ];
@@ -344,7 +462,7 @@ static char* gfx_sdl_get_clipboard_text(void) {
 }
 
 static void gfx_sdl_set_clipboard_text(const char* text) { SDL_SetClipboardText(text); }
-static void gfx_sdl_set_cursor_visible(bool visible) { SDL_ShowCursor(visible ? SDL_ENABLE : SDL_DISABLE); }
+static void gfx_sdl_set_cursor_visible(bool visible) { gfx_sdl_set_cursor_state(visible); }
 
 struct GfxWindowManagerAPI gfx_sdl = {
     gfx_sdl_init,
@@ -370,4 +488,4 @@ struct GfxWindowManagerAPI gfx_sdl = {
     gfx_sdl_has_focus
 };
 
-#endif // BACKEND_WM
+#endif
