@@ -3,20 +3,20 @@
 #include <PR/gbi.h>
 
 static const struct LumaUITheme sLumaUITheme = {
-    .backdrop      = {  10,  16,  28, 255 },
-    .panel         = {  22,  31,  52, 255 },
-    .panelBorder   = { 104, 150, 255, 255 },
-    .card          = {  15,  21,  38, 255 },
-    .cardBorder    = {  72, 102, 170, 255 },
-    .primary       = { 240, 198,  76, 255 },
-    .primaryBorder = { 255, 234, 148, 255 },
-    .accent        = { 154, 198, 255, 255 },
-    .text          = { 255, 255, 255, 255 },
-    .mutedText     = { 181, 197, 230, 255 },
-    .badge         = {  44,  68, 110, 255 },
-    .badgeBorder   = { 120, 174, 255, 255 },
+    .backdrop      = {   5,   9,  18, 255 },
+    .panel         = {  20,  29,  49, 255 },
+    .panelBorder   = { 226, 190, 102, 255 },
+    .card          = {  11,  17,  29, 255 },
+    .cardBorder    = {  82, 112, 170, 255 },
+    .primary       = { 244, 202,  78, 255 },
+    .primaryBorder = { 255, 243, 176, 255 },
+    .accent        = { 114, 201, 255, 255 },
+    .text          = { 255, 249, 232, 255 },
+    .mutedText     = { 187, 210, 232, 255 },
+    .badge         = {  31,  54,  98, 255 },
+    .badgeBorder   = { 154, 211, 255, 255 },
     .cursor        = { 255, 255, 255, 255 },
-    .cursorShadow  = {  24,  24,  24, 255 },
+    .cursorShadow  = {  12,  14,  19, 255 },
 };
 
 const struct LumaUITheme *lumaui_theme_get(void) {

@@ -21,6 +21,7 @@ struct LumaUIState {
     int sceneCount;
     int selectedIndex[LUMAUI_SCENE_COUNT];
     int pauseResult;
+    int pauseReopenLockFrames;
     int pendingStartSlot;
     bool pendingStartSound;
     struct LumaUIInputState input;

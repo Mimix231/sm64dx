@@ -43,6 +43,10 @@ void lumaui_core_update(void) {
     lumaui_core_init();
     lumaui_core_commit_pending_actions();
 
+    if (sLumaUIState.pauseReopenLockFrames > 0) {
+        sLumaUIState.pauseReopenLockFrames--;
+    }
+
     if (!lumaui_core_has_active_scene()) {
         return;
     }
@@ -61,7 +65,8 @@ void lumaui_core_render(void) {
     lumaui_scene_render(&sLumaUIState);
     lumaui_render_modal(&sLumaUIState);
     if (sLumaUIState.input.cursorVisible) {
-        lumaui_render_cursor((s16) sLumaUIState.input.cursorX, (s16) sLumaUIState.input.cursorY);
+        lumaui_render_cursor((s16) sLumaUIState.input.cursorX, (s16) sLumaUIState.input.cursorY,
+                             sLumaUIState.input.pointerDown);
     }
 }
 
@@ -80,7 +85,9 @@ bool lumaui_core_pause_menu_is_created(void) {
 
 void lumaui_core_pause_menu_create(void) {
     lumaui_core_init();
-    if (lumaui_core_is_in_main_menu() || lumaui_core_scene_is_active(LUMAUI_SCENE_PAUSE)) {
+    if (sLumaUIState.pauseReopenLockFrames > 0
+        || lumaui_core_is_in_main_menu()
+        || lumaui_core_scene_is_active(LUMAUI_SCENE_PAUSE)) {
         return;
     }
     lumaui_core_push_scene(LUMAUI_SCENE_PAUSE);
@@ -159,6 +166,7 @@ void lumaui_core_close_modal(void) {
 
 void lumaui_core_request_pause_resume(void) {
     sLumaUIState.pauseResult = 1;
+    sLumaUIState.pauseReopenLockFrames = 8;
     if (lumaui_core_get_active_scene() == LUMAUI_SCENE_PAUSE) {
         lumaui_core_pop_scene();
     }

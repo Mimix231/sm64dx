@@ -146,35 +146,70 @@ static int lumaui_scene_default_save_slot_index(void) {
 }
 
 static struct LumaUIRect lumaui_title_button_rect(int index) {
-    struct LumaUIRect rect = { 174, (s16) (84 + index * 24), 94, 18 };
+    struct LumaUIRect rect = { 150, (s16) (96 + index * 24), 110, 20 };
     return rect;
 }
 
 static struct LumaUIRect lumaui_save_card_rect(int index) {
-    s16 x = (index % 2 == 0) ? 28 : 170;
-    s16 y = (index < 2) ? 72 : 132;
-    struct LumaUIRect rect = { x, y, 122, 48 };
+    s16 x = (index % 2 == 0) ? 30 : 164;
+    s16 y = (index < 2) ? 74 : 126;
+    struct LumaUIRect rect = { x, y, 126, 46 };
     return rect;
 }
 
 static struct LumaUIRect lumaui_save_button_rect(bool primary) {
     struct LumaUIRect rect = {
-        primary ? 28 : 170,
-        190,
-        122,
+        196,
+        primary ? 176 : 198,
+        74,
         18,
     };
     return rect;
 }
 
 static struct LumaUIRect lumaui_option_button_rect(int index) {
-    struct LumaUIRect rect = { 88, (s16) (110 + index * 24), 144, 18 };
+    struct LumaUIRect rect = { 72, (s16) (118 + index * 24), 176, 20 };
     return rect;
 }
 
 static struct LumaUIRect lumaui_pause_button_rect(void) {
-    struct LumaUIRect rect = { 58, 98, 92, 18 };
+    struct LumaUIRect rect = { 62, 104, 96, 20 };
     return rect;
+}
+
+static void lumaui_scene_build_recent_summary(char *buffer, size_t size,
+                                              const struct Sm64dxSaveSummary *summary) {
+    if (summary == NULL || !summary->exists) {
+        snprintf(buffer, size,
+                 "No recent file.\n"
+                 "Press Start to open\n"
+                 "the save selector.");
+        return;
+    }
+
+    snprintf(buffer, size,
+             "%s\n"
+             "%s\n"
+             "%s\n"
+             "%s",
+             summary->title,
+             summary->name,
+             summary->starsLine,
+             summary->lastPlayedLine);
+}
+
+static void lumaui_scene_build_selected_save_details(char *buffer, size_t size,
+                                                     const struct Sm64dxSaveSummary *summary) {
+    if (summary == NULL) {
+        buffer[0] = '\0';
+        return;
+    }
+
+    snprintf(buffer, size,
+             "%s\n"
+             "%s",
+             summary->progressionLine,
+             summary->playTimeLine);
 }
 
 static void lumaui_title_activate(struct LumaUIState *state, int index) {
@@ -402,40 +437,42 @@ void lumaui_scene_update(struct LumaUIState *state) {
 static void lumaui_scene_render_title(struct LumaUIState *state) {
     const struct LumaUITheme *theme = lumaui_theme_get();
     const struct LumaUIInputState *input = &state->input;
-    struct LumaUIRect shell = { 20, 16, 280, 208 };
-    struct LumaUIRect infoCard = { 34, 72, 120, 120 };
-    struct LumaUIRect menuCard = { 166, 72, 112, 118 };
-    struct LumaUIRect badge = { 34, 54, 56, 14 };
+    struct LumaUIRect shell = { 22, 14, 276, 208 };
+    struct LumaUIRect headerCard = { 34, 24, 230, 26 };
+    struct LumaUIRect infoCard = { 34, 66, 96, 124 };
+    struct LumaUIRect menuCard = { 142, 66, 126, 130 };
+    struct LumaUIRect badge = { 42, 29, 56, 16 };
+    struct LumaUIRect infoBadge = { infoCard.x + 8, infoCard.y + 8, 60, 16 };
+    struct LumaUIRect menuBadge = { menuCard.x + 8, menuCard.y + 8, 44, 16 };
+    struct LumaUIRect infoClip = { infoCard.x + 8, infoCard.y + 30, infoCard.w - 16, infoCard.h - 38 };
     struct Sm64dxSaveSummary summary = { 0 };
     char infoText[256] = { 0 };
 
     lumaui_render_backdrop();
     lumaui_render_panel(&shell, &theme->panel, &theme->panelBorder);
+    lumaui_render_card(&headerCard, true);
     lumaui_render_card(&infoCard, false);
     lumaui_render_card(&menuCard, true);
     lumaui_render_badge(&badge, "Offline");
 
-    lumaui_render_text_centered(160, 30, lumaui_assets_brand_name(), &theme->text);
-    lumaui_render_text_centered(160, 44, lumaui_assets_scene_subtitle(LUMAUI_SCENE_TITLE), &theme->mutedText);
+    lumaui_render_text_centered(149, headerCard.y + 4, lumaui_assets_brand_name(), &theme->text);
+    lumaui_render_text_centered(199, headerCard.y + 4, "Phase 3", &theme->mutedText);
+    lumaui_render_text_centered(160, 54, "Offline-first adventure.", &theme->mutedText);
 
     if (sm64dx_has_recent_save()) {
         int slot = sm64dx_get_recent_save_slot();
         sm64dx_build_save_summary(slot, &summary);
-        snprintf(infoText, sizeof(infoText),
-                 "Recent: %s\n%s\n%s\n%s\n\nMoonOS, custom levels, and\nromhack browsing move here\nin later LumaUI phases.",
-                 summary.title,
-                 summary.name,
-                 summary.starsLine,
-                 summary.lastPlayedLine);
     } else {
-        snprintf(infoText, sizeof(infoText),
-                 "No recent file is ready yet.\n\nStart opens the new\nfullscreen save flow.\n\nsm64dx is moving to an\noffline-first, moddable\nsingle-player frontend.");
+        memset(&summary, 0, sizeof(summary));
     }
+    lumaui_scene_build_recent_summary(infoText, sizeof(infoText), &summary);
 
-    lumaui_render_text(infoCard.x + 8, infoCard.y + 12, "Adventure", &theme->accent);
-    lumaui_render_text_block(infoCard.x + 8, infoCard.y + 28, infoText, &theme->text);
+    lumaui_render_badge(&infoBadge, "Recent");
+    lumaui_render_badge(&menuBadge, "Play");
+    lumaui_render_push_clip(&infoClip);
+    lumaui_render_text_block_wrapped(infoCard.x + 8, infoCard.y + 32, infoCard.w - 16, infoText, &theme->text);
+    lumaui_render_pop_clip();
 
-    lumaui_render_text(menuCard.x + 8, menuCard.y + 12, "LumaUI Title", &theme->accent);
     for (int i = 0; i < LUMAUI_ARRAY_LEN(sLumaUITitleButtons); i++) {
         struct LumaUIRect rect = lumaui_title_button_rect(i);
         struct LumaUIButtonSpec button = {
@@ -449,7 +486,7 @@ static void lumaui_scene_render_title(struct LumaUIState *state) {
     }
 
     if (lumaui_scene_setup_required()) {
-        lumaui_render_text(176, 182, "First-run setup required", &theme->accent);
+        lumaui_render_text(150, 196, "Finish setup in Options.", &theme->accent);
     }
 
     lumaui_render_action_bar("A Select  B Quit", get_version());
@@ -458,21 +495,27 @@ static void lumaui_scene_render_title(struct LumaUIState *state) {
 static void lumaui_scene_render_save_select(struct LumaUIState *state) {
     const struct LumaUITheme *theme = lumaui_theme_get();
     const struct LumaUIInputState *input = &state->input;
-    struct LumaUIRect shell = { 16, 14, 288, 212 };
-    struct LumaUIRect badge = { 28, 52, 62, 14 };
+    struct LumaUIRect shell = { 18, 12, 284, 212 };
+    struct LumaUIRect headerCard = { 30, 24, 240, 26 };
+    struct LumaUIRect badge = { 30, 56, 54, 16 };
+    struct LumaUIRect detailCard = { 30, 178, 150, 34 };
+    struct LumaUIRect detailClip = { detailCard.x + 8, detailCard.y + 8, detailCard.w - 16, detailCard.h - 12 };
     int selection = state->selectedIndex[LUMAUI_SCENE_SAVE_SELECT];
     struct Sm64dxSaveSummary selectedSummary = { 0 };
+    char detailText[160] = { 0 };
 
     if (selection < 0 || selection >= NUM_SAVE_FILES) {
         selection = lumaui_scene_default_save_slot_index();
     }
     sm64dx_build_save_summary(selection + 1, &selectedSummary);
+    lumaui_scene_build_selected_save_details(detailText, sizeof(detailText), &selectedSummary);
 
     lumaui_render_backdrop();
     lumaui_render_panel(&shell, &theme->panel, &theme->panelBorder);
+    lumaui_render_card(&headerCard, true);
     lumaui_render_badge(&badge, "Saves");
-    lumaui_render_text_centered(160, 28, lumaui_assets_scene_name(LUMAUI_SCENE_SAVE_SELECT), &theme->text);
-    lumaui_render_text_centered(160, 42, lumaui_assets_scene_subtitle(LUMAUI_SCENE_SAVE_SELECT), &theme->mutedText);
+    lumaui_render_text_centered(160, headerCard.y + 4, lumaui_assets_scene_name(LUMAUI_SCENE_SAVE_SELECT), &theme->text);
+    lumaui_render_text_centered(160, 58, "Pick a file and launch.", &theme->mutedText);
 
     for (int i = 0; i < NUM_SAVE_FILES; i++) {
         struct Sm64dxSaveSummary summary = { 0 };
@@ -481,18 +524,23 @@ static void lumaui_scene_render_save_select(struct LumaUIState *state) {
 
         sm64dx_build_save_summary(i + 1, &summary);
         lumaui_render_card(&card, selection == i || hovered);
-        lumaui_render_text(card.x + 6, card.y + 6, summary.title, &theme->accent);
-        lumaui_render_text(card.x + 6, card.y + 17, summary.name, &theme->text);
-        lumaui_render_text(card.x + 6, card.y + 28, summary.starsLine, &theme->mutedText);
-        lumaui_render_text(card.x + 6, card.y + 39, summary.unlocksLine, &theme->mutedText);
+        lumaui_render_text(card.x + 6, card.y + 7, summary.title, &theme->accent);
+        lumaui_render_text(card.x + 6, card.y + 26, summary.exists ? summary.starsLine : summary.action,
+                           summary.exists ? &theme->text : &theme->mutedText);
     }
+
+    lumaui_render_card(&detailCard, true);
+    lumaui_render_push_clip(&detailClip);
+    lumaui_render_text(detailCard.x + 8, detailCard.y + 8, selectedSummary.name, &theme->accent);
+    lumaui_render_text_block_wrapped(detailCard.x + 8, detailCard.y + 20, detailCard.w - 16, detailText, &theme->text);
+    lumaui_render_pop_clip();
 
     {
         struct LumaUIRect primary = lumaui_save_button_rect(true);
         struct LumaUIRect secondary = lumaui_save_button_rect(false);
         struct LumaUIButtonSpec startButton = {
             .rect = primary,
-            .label = selectedSummary.action,
+            .label = "Launch",
             .primary = true,
             .selected = true,
             .hovered = input->cursorVisible && lumaui_render_point_in_rect(input->cursorX, input->cursorY, &primary),
@@ -509,16 +557,15 @@ static void lumaui_scene_render_save_select(struct LumaUIState *state) {
         lumaui_render_button(&backButton);
     }
 
-    lumaui_render_text(28, 176, selectedSummary.progressionLine, &theme->text);
-    lumaui_render_text(28, 184, selectedSummary.playTimeLine, &theme->mutedText);
     lumaui_render_action_bar("A Launch  B Back", get_version());
 }
 
 static void lumaui_scene_render_options(struct LumaUIState *state) {
     const struct LumaUITheme *theme = lumaui_theme_get();
     const struct LumaUIInputState *input = &state->input;
-    struct LumaUIRect shell = { 40, 22, 240, 196 };
-    struct LumaUIRect badge = { 56, 52, 64, 14 };
+    struct LumaUIRect shell = { 44, 22, 232, 194 };
+    struct LumaUIRect headerCard = { 58, 34, 204, 24 };
+    struct LumaUIRect badge = { 60, 66, 64, 16 };
     char languageLabel[64] = { 0 };
     char fpsLabel[64] = { 0 };
     const bool firstRun = lumaui_scene_setup_required();
@@ -528,14 +575,15 @@ static void lumaui_scene_render_options(struct LumaUIState *state) {
 
     lumaui_render_backdrop();
     lumaui_render_panel(&shell, &theme->panel, &theme->panelBorder);
+    lumaui_render_card(&headerCard, true);
     lumaui_render_badge(&badge, firstRun ? "Setup" : "Options");
-    lumaui_render_text_centered(160, 34, lumaui_assets_scene_name(LUMAUI_SCENE_OPTIONS), &theme->text);
-    lumaui_render_text_centered(160, 48, firstRun ? "Select language and confirm startup defaults." : lumaui_assets_scene_subtitle(LUMAUI_SCENE_OPTIONS), &theme->mutedText);
+    lumaui_render_text_centered(160, headerCard.y + 4, lumaui_assets_scene_name(LUMAUI_SCENE_OPTIONS), &theme->text);
+    lumaui_render_text_centered(160, 68, firstRun ? "Select language and confirm." : "Core startup preferences.", &theme->mutedText);
 
-    lumaui_render_text_block(58, 74,
+    lumaui_render_text_block_wrapped(60, 86, shell.w - 32,
                              firstRun
-                                 ? "This is the first-run route for LumaUI.\nChoose the interface language now.\nMore settings move here in later phases."
-                                 : "These are the first title-side options.\nThe full settings stack moves into LumaUI later.\nUse left or right to change the selected row.",
+                                 ? "Choose the interface language now.\nThe rest of the settings stack\nmoves into LumaUI later."
+                                 : "Use left or right on the selected row.\nThis scene will grow into the full\nsettings stack in later phases.",
                              &theme->text);
 
     for (int i = 0; i < 3; i++) {
@@ -557,10 +605,12 @@ static void lumaui_scene_render_options(struct LumaUIState *state) {
 static void lumaui_scene_render_pause(struct LumaUIState *state) {
     const struct LumaUITheme *theme = lumaui_theme_get();
     const struct LumaUIInputState *input = &state->input;
-    struct LumaUIRect shell = { 36, 24, 248, 184 };
-    struct LumaUIRect actionCard = { 50, 78, 108, 64 };
-    struct LumaUIRect summaryCard = { 170, 78, 94, 74 };
-    struct LumaUIRect buttonRect = lumaui_pause_button_rect();
+    struct LumaUIRect shell = { 56, 30, 208, 162 };
+    struct LumaUIRect headerCard = { 72, 42, 176, 24 };
+    struct LumaUIRect infoCard = { 72, 78, 176, 64 };
+    struct LumaUIRect infoBadge = { infoCard.x + 8, infoCard.y + 8, 72, 16 };
+    struct LumaUIRect buttonRect = { 114, 152, 92, 20 };
+    struct LumaUIRect infoClip = { infoCard.x + 8, infoCard.y + 28, infoCard.w - 16, infoCard.h - 36 };
     struct LumaUIButtonSpec button = {
         .rect = buttonRect,
         .label = "Resume",
@@ -573,16 +623,17 @@ static void lumaui_scene_render_pause(struct LumaUIState *state) {
 
     lumaui_render_backdrop();
     lumaui_render_panel(&shell, &theme->panel, &theme->panelBorder);
-    lumaui_render_card(&actionCard, false);
-    lumaui_render_card(&summaryCard, true);
-    lumaui_render_text_centered(160, 34, lumaui_assets_scene_name(LUMAUI_SCENE_PAUSE), &theme->text);
-    lumaui_render_text_centered(160, 48, lumaui_assets_scene_subtitle(LUMAUI_SCENE_PAUSE), &theme->mutedText);
-    lumaui_render_text(actionCard.x + 8, actionCard.y + 12, "Paused", &theme->accent);
+    lumaui_render_card(&headerCard, true);
+    lumaui_render_card(&infoCard, true);
+    lumaui_render_badge(&infoBadge, "Gameplay");
+    lumaui_render_text_centered(160, headerCard.y + 4, lumaui_assets_scene_name(LUMAUI_SCENE_PAUSE), &theme->text);
+    lumaui_render_text_centered(160, 72, "Resume or go back.", &theme->mutedText);
+    lumaui_render_push_clip(&infoClip);
+    lumaui_render_text_block_wrapped(infoCard.x + 8, infoCard.y + 30, infoCard.w - 16,
+                                     "Course info, player, and MoonOS move into this pause flow next.",
+                                     &theme->text);
+    lumaui_render_pop_clip();
     lumaui_render_button(&button);
-    lumaui_render_text(summaryCard.x + 8, summaryCard.y + 14, "Gameplay", &theme->accent);
-    lumaui_render_text_block(summaryCard.x + 8, summaryCard.y + 28,
-                             "Pause already routes\nthrough LumaUI.\nCourse info, player,\nand MoonOS land next.",
-                             &theme->text);
     lumaui_render_action_bar("A Resume  B Resume", "Pause");
 }
 

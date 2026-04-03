@@ -4,15 +4,10 @@
 #include <stdbool.h>
 #include <PR/ultratypes.h>
 
+#include "lumaui_space.h"
+
 struct LumaUIColor;
 struct LumaUIState;
-
-struct LumaUIRect {
-    s16 x;
-    s16 y;
-    s16 w;
-    s16 h;
-};
 
 struct LumaUIButtonSpec {
     struct LumaUIRect rect;
@@ -36,8 +31,12 @@ void lumaui_render_action_bar(const char *leftText, const char *rightText);
 void lumaui_render_text(s16 x, s16 y, const char *text, const struct LumaUIColor *color);
 void lumaui_render_text_centered(s16 centerX, s16 y, const char *text, const struct LumaUIColor *color);
 void lumaui_render_text_block(s16 x, s16 y, const char *text, const struct LumaUIColor *color);
-void lumaui_render_cursor(s16 x, s16 y);
+void lumaui_render_text_block_wrapped(s16 x, s16 y, s16 maxWidth, const char *text,
+                                      const struct LumaUIColor *color);
+void lumaui_render_cursor(s16 x, s16 y, bool pressed);
 void lumaui_render_modal(struct LumaUIState *state);
 bool lumaui_render_point_in_rect(s32 x, s32 y, const struct LumaUIRect *rect);
+void lumaui_render_push_clip(const struct LumaUIRect *rect);
+void lumaui_render_pop_clip(void);
 
 #endif
